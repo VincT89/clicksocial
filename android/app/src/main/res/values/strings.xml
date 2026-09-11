@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ClickSocial</string>
+    <string name="title_activity_main">ClickSocial</string>
+    <string name="package_name">it.sodanoconsulting.clicksocial</string>
+    <string name="custom_url_scheme">it.sodanoconsulting.clicksocial</string>
+</resources>

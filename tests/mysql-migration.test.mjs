@@ -1,0 +1,38 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { randomUUID, createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { resolve, join } from 'node:path';
+import { loadConfig } from '../server/config.mjs';
+import { openStore, uid, now, hashPassword, encrypt, decrypt } from '../server/store.mjs';
+import { saveImage } from '../server/files.mjs';
+import { sqliteSnapshot, migrateSnapshot } from '../server/mysql-migration.mjs';
+import { testDatabase } from './helpers/database.mjs';
+
+test('migrazione SQLite-MySQL: dati identici, password e foto conservate, rollback e destinazione protetta', {skip:!process.env.CLICKSOCIAL_TEST_MYSQL}, async t => {
+  const dataDir=resolve('work/tests',randomUUID());
+  const sourceConfig=loadConfig({dbDriver:'sqlite',dataDir});
+  const source=await openStore(sourceConfig);
+  const id=uid(),password=await hashPassword('Migration-test-password');
+  await source.prepare("INSERT INTO users(id,email,password,verified,role,plan,profile,created_at) VALUES (?,?,?,1,'admin','pro',?,?)").run(id,'migration@example.test',password,JSON.stringify({company_name:'Attività di collaudo',tone_of_voice:'Professionale'}),now());
+  const image=await saveImage(source,sourceConfig,{id},Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6kHcAAAAASUVORK5CYII=','base64'),'fixture.png');
+  await source.prepare('INSERT INTO posts VALUES (?,?,?,?,?)').run(uid(),id,JSON.stringify({image_url:image.file_url,status:'pronto',caption:'Caffè di prova',editorial_at:'2026-09-11T10:00:00.000Z',editorial_notes:'Nota di collaudo'}),now(),now());
+  await source.prepare('INSERT INTO social_connections VALUES (?,?)').run(id,encrypt(sourceConfig,{pages:[{id:'fixture-page',access_token:'token-used-only-in-tests'}]}));
+  await source.close();
+  const checksum=()=>createHash('sha256').update(readFileSync(join(dataDir,'clicksocial.sqlite'))).digest('hex');
+  const before=checksum(),snapshot=sqliteSnapshot(sourceConfig);
+  const config=loadConfig({...await testDatabase(),dataDir});
+  const target=await openStore(config); t.after(()=>target.close());
+  const broken=structuredClone(snapshot); broken.rows.posts[0].user_id=uid();
+  await assert.rejects(()=>migrateSnapshot(target,config,broken));
+  assert.equal((await target.prepare('SELECT COUNT(*) AS count FROM users').get()).count,0);
+  assert.deepEqual(await migrateSnapshot(target,config,snapshot),snapshot.counts);
+  const user=await target.prepare('SELECT * FROM users WHERE id=?').get(id);
+  assert.equal(user.password,password); assert.equal(user.role,'admin'); assert.equal(user.plan,'pro');
+  const connection=await target.prepare('SELECT encrypted FROM social_connections WHERE user_id=?').get(id);
+  assert.equal(decrypt(config,connection.encrypted).pages[0].access_token,'token-used-only-in-tests');
+  await assert.rejects(()=>migrateSnapshot(target,config,snapshot),/contiene già dati/);
+  assert.equal(checksum(),before);
+  const wrongKey={...config,encryptionKey:Buffer.alloc(32,42)};
+  await assert.rejects(()=>openStore(wrongKey),/chiave diversa/);
+});

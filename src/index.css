@@ -1,0 +1,203 @@
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600;700&display=swap');
+
+.native-keyboard-open .mobile-bottom-nav { display: none; }
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+    --background: 228 33% 97%;
+    --foreground: 222 18% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 18% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 18% 8%;
+    --primary: 243 100% 68%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 225 27% 96%;
+    --secondary-foreground: 222 18% 8%;
+    --muted: 225 27% 96%;
+    --muted-foreground: 226 8% 48%;
+    --accent: 252 100% 97%;
+    --accent-foreground: 243 100% 68%;
+    --destructive: 350 70% 48%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 222 21% 89%;
+    --input: 222 21% 89%;
+    --ring: 243 100% 68%;
+    --chart-1: 243 100% 68%;
+    --chart-2: 334 100% 65%;
+    --chart-3: 176 74% 51%;
+    --chart-4: 76 100% 69%;
+    --chart-5: 20 100% 61%;
+    --radius: 20px;
+    --font-heading: "Bricolage Grotesque", "Arial Black", sans-serif;
+    --font-body: "DM Sans", Arial, sans-serif;
+    --font-display: "Bricolage Grotesque", "Arial Black", sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    --purple: 243 100% 68%;
+    --purple-dark: 249 70% 57%;
+    --pink: 334 100% 65%;
+    --cyan: 176 74% 51%;
+    --lime: 76 100% 69%;
+    --orange: 20 100% 61%;
+    --facebook: 216 90% 60%;
+    --instagram: 332 69% 55%;
+    --tiktok: 225 11% 10%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 18% 8%;
+    --sidebar-primary: 243 100% 68%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 225 27% 96%;
+    --sidebar-accent-foreground: 222 18% 8%;
+    --sidebar-border: 222 21% 89%;
+    --sidebar-ring: 243 100% 68%;
+  }
+
+  .dark {
+    color-scheme: dark;
+    --background: 228 20% 8%;
+    --foreground: 228 20% 97%;
+    --card: 228 20% 10%;
+    --card-foreground: 228 20% 97%;
+    --popover: 228 20% 10%;
+    --popover-foreground: 228 20% 97%;
+    --primary: 243 100% 68%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 228 14% 16%;
+    --secondary-foreground: 228 20% 97%;
+    --muted: 228 14% 16%;
+    --muted-foreground: 226 8% 65%;
+    --accent: 243 40% 20%;
+    --accent-foreground: 243 100% 80%;
+    --destructive: 350 70% 48%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 228 14% 18%;
+    --input: 228 14% 18%;
+    --ring: 243 100% 68%;
+    --purple: 243 100% 68%;
+    --purple-dark: 249 70% 57%;
+    --pink: 334 100% 65%;
+    --cyan: 176 74% 51%;
+    --lime: 76 100% 69%;
+    --orange: 20 100% 61%;
+    --facebook: 216 90% 60%;
+    --instagram: 332 69% 55%;
+    --tiktok: 225 11% 10%;
+    --sidebar-background: 228 20% 8%;
+    --sidebar-foreground: 228 20% 97%;
+    --sidebar-primary: 243 100% 68%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 228 14% 16%;
+    --sidebar-accent-foreground: 228 20% 97%;
+    --sidebar-border: 228 14% 18%;
+    --sidebar-ring: 243 100% 68%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    scrollbar-width: none;
+  }
+
+  *::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+  }
+
+  fieldset,
+  input,
+  textarea,
+  select {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  textarea {
+    resize: vertical;
+  }
+}
+
+/* Safari ingrandisce i campi con caratteri piccoli quando ricevono il focus.
+   Vale anche nei modali e in orizzontale; lo zoom scelto dall'utente resta attivo. */
+@media (max-width: 1023px), (any-pointer: coarse) {
+  :root :is(input, textarea, select, [contenteditable="true"]) {
+    font-size: max(16px, 1rem);
+  }
+}
+
+@layer base {
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+
+  .overflow-auto,
+  .overflow-y-auto,
+  .overflow-x-auto {
+    overscroll-behavior: contain;
+  }
+
+  button,
+  a,
+  img,
+  nav,
+  header,
+  [role="button"] {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer components {
+  .nav-icon {
+    @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .nav-icon[aria-current="page"] {
+    @apply bg-accent text-purple;
+    box-shadow: inset 0 -2px 0 hsl(var(--purple));
+  }
+
+  .workspace-main {
+    @apply mx-auto w-full min-w-0 max-w-6xl px-4 py-6 sm:px-8 sm:py-8;
+  }
+
+  .workspace-title {
+    @apply font-heading text-2xl font-semibold sm:text-3xl;
+  }
+
+  .section-tabs {
+    @apply flex gap-1 border-b border-border;
+  }
+
+  .section-tab {
+    @apply min-h-11 min-w-0 flex-1 border-b-2 border-transparent px-2 py-2 text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-none sm:px-4;
+  }
+
+  .section-tab[aria-pressed="true"] {
+    @apply border-purple text-purple;
+  }
+
+  .pwa-shadow {
+    box-shadow: 0 20px 60px rgba(35, 38, 55, 0.12);
+  }
+
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}

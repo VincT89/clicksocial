@@ -1,0 +1,40 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { resolve, join } from 'node:path';
+import { randomBytes } from 'node:crypto';
+import { isPrivateAddress } from '../shared/mobile-config.mjs';
+
+export function loadConfig(overrides = {}) {
+  const root = resolve(import.meta.dirname, '..');
+  if (existsSync(join(root, '.env'))) process.loadEnvFile(join(root, '.env'));
+  const env = process.env;
+  const dataDir = resolve(root, overrides.dataDir || env.DATA_DIR || 'data');
+  mkdirSync(join(dataDir, 'uploads'), { recursive: true });
+  const keyFile = join(dataDir, '.encryption-key');
+  if (!existsSync(keyFile)) writeFileSync(keyFile, randomBytes(32).toString('hex'), { mode: 0o600, flag: 'wx' });
+  const config = {
+    root, dataDir, port: Number(env.PORT || 8787), host: '127.0.0.1',
+    origin: env.APP_ORIGIN || 'http://127.0.0.1:5180',
+    localMode: env.LOCAL_MODE !== 'false',
+    lanMode: false,
+    encryptionKey: Buffer.from(readFileSync(keyFile, 'utf8').trim(), 'hex'),
+    openaiKey: env.OPENAI_API_KEY || '', textModel: env.AI_TEXT_MODEL || '', imageModel: env.AI_IMAGE_MODEL || '',
+    stripeKey: env.STRIPE_SECRET_KEY || '', stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET || '', stripePriceId: env.STRIPE_PRICE_ID || '',
+    googleId: env.GOOGLE_CLIENT_ID || '', googleSecret: env.GOOGLE_CLIENT_SECRET || '',
+    metaId: env.META_APP_ID || '', metaSecret: env.META_APP_SECRET || '', metaVersion: env.META_GRAPH_VERSION || 'v25.0',
+    smtpHost: env.SMTP_HOST || '', smtpPort: Number(env.SMTP_PORT || 587), smtpSecure: env.SMTP_SECURE === 'true',
+    smtpUser: env.SMTP_USER || '', smtpPass: env.SMTP_PASSWORD || '', mailFrom: env.MAIL_FROM || '',
+    ...overrides,
+  };
+  config.dbDriver = String(overrides.dbDriver ?? env.DB_DRIVER ?? 'sqlite').toLowerCase();
+  config.mysql = {
+    host: env.MYSQL_HOST || '127.0.0.1', port: Number(env.MYSQL_PORT || 3306),
+    database: env.MYSQL_DATABASE || '', user: env.MYSQL_USER || '', password: env.MYSQL_PASSWORD || '',
+    ssl: env.MYSQL_SSL === 'true', ca: env.MYSQL_SSL_CA || '', ...overrides.mysql,
+  };
+  if (!['sqlite', 'mysql'].includes(config.dbDriver)) throw new Error('DB_DRIVER deve essere sqlite oppure mysql.');
+  if (config.lanMode && (!config.localMode || !isPrivateAddress(new URL(config.origin).hostname) || !isPrivateAddress(config.host))) throw new Error('Il collaudo Wi-Fi richiede un indirizzo privato esplicito.');
+  if (config.localMode && !config.lanMode && !['localhost', '127.0.0.1'].includes(new URL(config.origin).hostname)) throw new Error('LOCAL_MODE richiede un indirizzo localhost.');
+  if (!config.localMode && !config.origin.startsWith('https://')) throw new Error('Fuori dalla modalita locale serve APP_ORIGIN HTTPS.');
+  if (config.encryptionKey.length !== 32) throw new Error('Chiave di cifratura locale non valida.');
+  return config;
+}

@@ -1,0 +1,49 @@
+workflows:
+  android-local:
+    name: ClickSocial Android - test su Wi-Fi
+    instance_type: linux_x2
+    max_build_duration: 60
+    environment:
+      node: 24.10.0
+      java: 21
+      groups:
+        - clicksocial_local
+    scripts:
+      - name: Installa dipendenze
+        script: npm ci --cache ./work/npm-cache
+      - name: Verifica applicazione
+        script: |
+          npm run lint
+          npm run typecheck
+          npm test
+      - name: Compila APK di collaudo
+        script: npm run mobile:android
+    artifacts:
+      - work/mobile-builds/ClickSocial-test.apk
+
+  ios-simulator:
+    name: ClickSocial iOS - compilazione per simulatore
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      node: 24.10.0
+      xcode: latest
+      groups:
+        - clicksocial_local
+    scripts:
+      - name: Installa dipendenze
+        script: npm ci --cache ./work/npm-cache
+      - name: Verifica applicazione
+        script: |
+          npm run lint
+          npm run typecheck
+          npm test
+      - name: Prepara progetto iOS
+        script: npm run mobile:prepare -- --platform=ios
+      - name: Compila per simulatore senza firma Apple
+        script: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath work/ios-build CODE_SIGNING_ALLOWED=NO build
+          mkdir -p work/mobile-builds
+          ditto -c -k --sequesterRsrc --keepParent work/ios-build/Build/Products/Debug-iphonesimulator/App.app work/mobile-builds/ClickSocial-simulatore.zip
+    artifacts:
+      - work/mobile-builds/ClickSocial-simulatore.zip

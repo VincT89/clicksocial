@@ -1,0 +1,67 @@
+# Variabili d'ambiente e configurazioni locali
+.env
+.env.*
+*.local
+!.env.example
+
+# Dipendenze e output web
+node_modules
+dist
+dist-ssr
+.vite
+
+# Log
+/logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor e sistema operativo
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Collegamento locale Base44
+base44/.app.jsonc
+
+# Dati locali e materiali di sviluppo
+data/
+work/
+
+# Output mobile
+dist-mobile/
+
+# Android: cache, configurazione locale e output
+android/.gradle/
+android/local.properties
+android/app/build/
+android/build/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+
+# iOS: dipendenze e output
+ios/App/App/public/
+ios/App/App/capacitor.config.json
+ios/App/Pods/
+ios/build/
+
+# Esclusioni personalizzate: verificare che i file siano rigenerati
+android/app/src/main/res/xml/network_security_config.xml
+ios/App/App/Info.runtime.plist
+
+# Chiavi e certificati di firma
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
+*.p8
