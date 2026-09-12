@@ -23,7 +23,14 @@ test('Registrazione costi: persistenza di testo, immagine, logo e chiamate falli
   await app.db.prepare("INSERT INTO users(id,email,verified,role,plan,profile,created_at) VALUES(?,?,1,'admin','pro','{}',?)").run(user.id,user.email,now());
   const photo=(await saveImage(app.db,app.config,user,png,'foto.png')).file_url;
   await app.db.prepare('UPDATE users SET profile=? WHERE id=?').run(JSON.stringify({company_logo_url:photo}),user.id);
-  const latest=async()=>JSON.parse((await app.db.prepare('SELECT data FROM ai_logs WHERE user_id=? ORDER BY created_at DESC').get(user.id)).data);
+  const recordedLogIds=new Set();
+  const readNewLog=async()=>{
+    const rows=await app.db.prepare('SELECT id,data FROM ai_logs WHERE user_id=?').all(user.id);
+    const added=rows.filter(row=>!recordedLogIds.has(row.id));
+    assert.equal(added.length,1,'Ogni operazione deve aggiungere un solo record AI.');
+    recordedLogIds.add(added[0].id);
+    return JSON.parse(added[0].data);
+  };
   const prepare = (imageFailure=false,invalidLayout=false) => {
     const ai = createIntegrations(app.db,app.config,async(url,options)=>{
       if (url.endsWith('/images/edits')) return imageFailure ? Response.json({error:{message:'Errore immagine di prova'}},{status:502})
@@ -37,7 +44,7 @@ test('Registrazione costi: persistenza di testo, immagine, logo e chiamate falli
   };
   await t.test('una generazione salva tre fasi e lo snapshot del prezzo',async()=>{
     await prepare().generateCopy(user,{file_url:photo,mode:'creative'});
-    const log=await latest();
+    const log=await readNewLog();
     assert.deepEqual(log.ai_calls.map(call=>call.phase),['copy','image','logo']);
     assert.equal(log.ai_calls[1].usage.output_tokens,1000);
     assert.equal(log.ai_calls[0].usage.input_tokens_details.cached_tokens,200);
@@ -47,24 +54,30 @@ test('Registrazione costi: persistenza di testo, immagine, logo e chiamate falli
   });
   await t.test('immagine fallita: il costo del testo resta nel subtotale',async()=>{
     await assert.rejects(()=>prepare(true).generateCopy(user,{file_url:photo,mode:'enhance'}));
-    const log=await latest();
+    const log=await readNewLog();
     assert.equal(log.status,'error'); assert.equal(log.cost.status,'partial'); assert.equal(log.cost.max_usd,0.0071);
     assert.equal(log.ai_calls.length,2); assert.equal(log.ai_calls[1].usage,null);
   });
   await t.test('layout non valido: i consumi già comunicati restano tutti conteggiati',async()=>{
     await assert.rejects(()=>prepare(false,true).generateCopy(user,{file_url:photo,mode:'creative'}));
-    const log=await latest();
+    const log=await readNewLog();
     assert.equal(log.status,'error'); assert.equal(log.cost.status,'complete'); assert.equal(log.cost.max_usd,0.0448);
   });
-  await t.test('test di connessione: successi ed errori sono registrati; consumi mancanti non diventano zero',async()=>{
+  await t.test('test di connessione: successi ed errori nello stesso millisecondo; consumi mancanti non diventano zero',async t=>{
+    // Stesso istante per entrambe le chiamate, successivo ai log dei casi precedenti.
+    t.mock.timers.enable({apis:['Date'],now:Date.now()+1000});
     const success=createIntegrations(app.db,app.config,async()=>Response.json(response('ok',10,1)));
     await success.aiStatus(user);
-    let log=await latest();
+    let log=await readNewLog();
+    assert.equal(log.status,'success');
     assert.equal(log.ai_calls[0].phase,'connection'); assert.equal(log.cost.max_usd,0.00008);
     const failure=createIntegrations(app.db,app.config,async()=>Response.json({error:{message:'Errore di prova'}},{status:500}));
     await assert.rejects(()=>failure.aiStatus(user));
-    log=await latest();
+    log=await readNewLog();
     assert.equal(log.operation,'aiStatus'); assert.equal(log.status,'error'); assert.equal(log.cost.max_usd,null);
     assert.equal(log.prompt_tokens,null); assert.equal(log.output_tokens,null);
+    const connectionLogs=await app.db.prepare(`SELECT created_at FROM ai_logs WHERE user_id=? AND ${app.db.json('operation')}=?`).all(user.id,'aiStatus');
+    assert.equal(connectionLogs.length,2);
+    assert.equal(connectionLogs[0].created_at,connectionLogs[1].created_at);
   });
 });
