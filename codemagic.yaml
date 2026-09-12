@@ -47,3 +47,75 @@ workflows:
           ditto -c -k --sequesterRsrc --keepParent work/ios-build/Build/Products/Debug-iphonesimulator/App.app work/mobile-builds/ClickSocial-simulatore.zip
     artifacts:
       - work/mobile-builds/ClickSocial-simulatore.zip
+
+  ios-testflight:
+    name: ClickSocial iPhone - TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      node: 24.10.0
+      xcode: latest
+      groups:
+        - clicksocial_local
+        - clicksocial_apple
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: it.sodanoconsulting.clicksocial
+    scripts:
+      - name: Verifica branch e configurazione iPhone
+        script: |
+          set -euo pipefail
+          if [ "${CM_BRANCH:-}" != "main_vincenzo" ]; then
+            echo "Avvia questa compilazione dal branch main_vincenzo."
+            exit 1
+          fi
+          for variable in MOBILE_API_ORIGIN APP_STORE_CONNECT_PRIVATE_KEY APP_STORE_CONNECT_KEY_IDENTIFIER APP_STORE_CONNECT_ISSUER_ID; do
+            if [ -z "${!variable:-}" ]; then
+              echo "Variabile Codemagic mancante: $variable. Consulta MOBILE.md."
+              exit 1
+            fi
+          done
+          if ! [[ "${BUILD_NUMBER:-}" =~ ^[0-9]+$ ]]; then
+            echo "Il numero della compilazione Codemagic non è disponibile."
+            exit 1
+          fi
+      - name: Installa dipendenze
+        script: npm ci --cache ./work/npm-cache
+      - name: Verifica applicazione
+        script: |
+          set -euo pipefail
+          npm run lint
+          npm run typecheck
+          npm test
+      - name: Prepara progetto iOS
+        script: npm run mobile:prepare -- --platform=ios
+      - name: Applica la firma Apple al progetto
+        script: |
+          set -euo pipefail
+          xcode-project use-profiles \
+            --project ios/App/App.xcodeproj \
+            --export-options-plist work/ios-export-options.plist
+      - name: Compila il pacchetto per iPhone
+        script: |
+          set -euo pipefail
+          IOS_BUILD_NUMBER=$((10#$BUILD_NUMBER + 1))
+          xcode-project build-ipa \
+            --project ios/App/App.xcodeproj \
+            --scheme App \
+            --config Release \
+            --archive-directory work/ios-archive \
+            --ipa-directory work/mobile-builds/ios \
+            --export-options-plist work/ios-export-options.plist \
+            --archive-xcargs "CURRENT_PROJECT_VERSION=$IOS_BUILD_NUMBER COMPILER_INDEX_STORE_ENABLE=NO"
+    artifacts:
+      - work/mobile-builds/ios/*.ipa
+      - work/ios-archive/**/*.dSYM
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        # Carica la build. L'aggiunta ai tester interni si completa in App Store Connect.
+        submit_to_testflight: false
+        submit_to_app_store: false

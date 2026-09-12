@@ -59,7 +59,7 @@ export default function Profile() {
       </nav>
       <section hidden={section !== 'company'} data-tour="profile-company" className="max-w-4xl rounded-xl border border-border bg-card p-5 sm:p-6">
         <h2 className="font-heading text-xl mb-2">La tua attività</h2>
-        <p className="text-sm text-muted-foreground mb-6">Queste informazioni guidano i testi creati con AI. Scegli il tono di voce che rappresenta il tuo brand.</p>
+        <p className="text-sm text-muted-foreground mb-6">Informazioni, loghi, font e colori vengono recuperati automaticamente per i nuovi post. I contenuti già salvati conservano la propria identità grafica.</p>
         {me && <CompanyCard me={me} onSaved={setMe} />}
       </section>
       <section hidden={section !== 'social'} data-tour="profile-social" className="max-w-4xl rounded-xl border border-border bg-card p-5 sm:p-6">
@@ -81,7 +81,7 @@ export default function Profile() {
           <Button onClick={upgrade} disabled={upgrading || !settings.stripeEnabled}>{upgrading ? 'Apertura pagamento…' : settings.stripeEnabled ? 'Passa a Pro' : 'Pagamenti da configurare'}</Button></>}
         <Button variant="outline" className="ml-0 sm:ml-3" onClick={refreshPlan}>Aggiorna stato del piano</Button>
       </section>
-      <section hidden={section !== 'account'} className="max-w-4xl rounded-xl border border-border bg-card p-5 sm:p-6 space-y-5">
+      <section hidden={section !== 'account'} data-tour="profile-access" className="max-w-4xl rounded-xl border border-border bg-card p-5 sm:p-6 space-y-5">
         <h2 className="font-heading text-xl">Account</h2>
         <div><p className="text-sm text-muted-foreground mb-3">Gestisci l’accesso senza perdere i contenuti salvati.</p><Button variant="outline" asChild><Link to="/forgot-password">Imposta o cambia password</Link></Button></div>
         <div><Button variant="outline" data-tour="profile-logout" onClick={handleLogout}>Esci dall’account</Button></div>

@@ -41,7 +41,7 @@ export default function EditorialCalendar({ month, setMonth, selected, onSelect,
               className={['w-full min-w-0 h-14 sm:h-20 p-1 sm:p-2 border-r border-b border-border flex flex-col items-start text-left focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-purple',current ? 'bg-accent ring-2 ring-inset ring-purple' : 'hover:bg-secondary', date.getMonth() === month.getMonth() ? '' : 'text-muted-foreground bg-secondary/30'].join(' ')}>
               <span className={['text-xs sm:text-sm w-6 h-6 flex items-center justify-center rounded-full', key === today ? 'bg-purple text-white font-bold' : ''].join(' ')}>{date.getDate()}</span>
               {posts.length > 0 && <>
-                <span className="sm:hidden text-[10px] font-medium mt-1">{posts.length} post</span>
+                <span className="sm:hidden text-[10px] font-medium mt-1" aria-hidden="true">{posts.length}</span>
                 <div className="hidden sm:block w-full min-w-0 mt-1">{posts.slice(0,posts.length > 2 ? 1 : 2).map(p => <span key={p.id} title={STAGES[editorialStage(p)] + ': ' + p.title} className="block truncate text-[11px] leading-4 border-l-2 border-purple pl-1">{p.title || 'Senza titolo'}</span>)}
                   {posts.length > 2 && <span className="block text-[10px] leading-4">Altri {posts.length - 1}</span>}
                 </div>

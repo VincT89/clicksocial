@@ -2,6 +2,8 @@ import React, { forwardRef, useEffect, useId, useImperativeHandle, useRef, useSt
 import { acquireImage } from '@/lib/mobile';
 import { drawFilteredImage } from '@/lib/photoFilters';
 import { layoutHeadline } from '@/lib/headlineLayout';
+import { renderTemplate } from '@/lib/templateRenderer';
+import { FORMATS } from '../../../shared/templates.mjs';
 import { Slider } from "@/components/ui/slider";
 import { api } from "@/api/client";
 import { RotateCcw, Loader2, LockKeyhole, LockKeyholeOpen } from "lucide-react";
@@ -65,14 +67,15 @@ async function drawPhoto(canvas, source, filters, headline) {
   }
 }
 
-const PhotoEditor = forwardRef(/** @param {{imageUrl:string,headline?:string,filters:any,activePreset:any,onFiltersChange:Function,onPresetChange:Function,disabled?:boolean}} props */ function PhotoEditor(
-  { imageUrl, headline, filters, activePreset, onFiltersChange, onPresetChange, disabled = false },
+const PhotoEditor = forwardRef(/** @param {{imageUrl:string,headline?:string,subtitle?:string,design?:any,filters:any,activePreset:any,onFiltersChange:Function,onPresetChange:Function,disabled?:boolean}} props */ function PhotoEditor(
+  { imageUrl, headline, subtitle = '', design = null, filters, activePreset, onFiltersChange, onPresetChange, disabled = false },
   ref
 ) {
   const [exporting, setExporting] = useState(false);
   const canvasRef = useRef(null);
   const [loaded, setLoaded] = useState(null);
   const [imageError, setImageError] = useState("");
+  const [layoutWarning, setLayoutWarning] = useState('');
   const [unlockedFilters, setUnlockedFilters] = useState([]);
   const sliderRefs = useRef({});
   const filterHelpId = useId();
@@ -82,6 +85,7 @@ const PhotoEditor = forwardRef(/** @param {{imageUrl:string,headline?:string,fil
   useEffect(() => {
     let active = true;
     setImageError("");
+    setLayoutWarning('');
     setUnlockedFilters([]);
     const image = new Image();
     image.crossOrigin = "anonymous";
@@ -111,16 +115,19 @@ const PhotoEditor = forwardRef(/** @param {{imageUrl:string,headline?:string,fil
     const frame = requestAnimationFrame(async () => {
       try {
         const rendered = document.createElement('canvas');
-        await drawPhoto(rendered, source, filters, headline);
+        const warnings = [];
+        if (design) await renderTemplate(rendered, source, design, filters, headline, subtitle, { onWarning: message => warnings.push(message) });
+        else await drawPhoto(rendered, source, filters, headline);
         if (!active || !canvasRef.current) return;
         canvasRef.current.width = rendered.width; canvasRef.current.height = rendered.height;
         canvasRef.current.getContext('2d').drawImage(rendered, 0, 0);
         setImageError('');
+        setLayoutWarning(warnings.join(' '));
       }
-      catch (error) { if (active) setImageError(error.message); }
+      catch (error) { if (active) { setImageError(error.message); setLayoutWarning(''); } }
     });
     return () => { active = false; cancelAnimationFrame(frame); };
-  }, [source, filters, headline]);
+  }, [source, filters, headline, subtitle, design]);
 
   const applyPreset = (preset) => {
     if (controlsDisabled) return;
@@ -157,10 +164,12 @@ const PhotoEditor = forwardRef(/** @param {{imageUrl:string,headline?:string,fil
         if (!source?.complete || !source.naturalWidth) throw new Error("Attendi il caricamento della foto prima di salvare.");
         await document.fonts.ready;
         const canvas = document.createElement("canvas");
-        await drawPhoto(canvas, source, filters, headline);
-        const blob = await new Promise((res) => canvas.toBlob(res, "image/jpeg", 0.92));
+        if (design) await renderTemplate(canvas, source, design, filters, headline, subtitle);
+        else await drawPhoto(canvas, source, filters, headline);
+        const mime = design ? 'image/png' : 'image/jpeg';
+        const blob = await new Promise((res) => canvas.toBlob(res, mime, 0.92));
         if (!blob) throw new Error("Impossibile esportare la foto. Riprova.");
-        const file = new File([blob], "clicksocial.jpg", { type: "image/jpeg" });
+        const file = new File([blob], design ? 'clicksocial.png' : 'clicksocial.jpg', { type: mime });
         const { file_url } = await api.integrations.Core.UploadFile({ file });
         return file_url;
       } finally {
@@ -182,10 +191,11 @@ const PhotoEditor = forwardRef(/** @param {{imageUrl:string,headline?:string,fil
 
   return (
     <div data-tour="studio-editor" className="space-y-6 min-w-0">
-      <div className="relative w-full rounded-xl overflow-hidden bg-foreground/[0.04] flex items-center justify-center aspect-square max-h-[520px]">
+      <div style={{ aspectRatio: design ? FORMATS[design.format].width / FORMATS[design.format].height : 1 }} className="relative w-full rounded-xl overflow-hidden bg-foreground/[0.04] flex items-center justify-center max-h-[640px]">
         <canvas ref={canvasRef} role="img" aria-label={headline ? `Anteprima della foto con il titolo: ${headline}` : "Anteprima della foto"} className={`block w-full h-full object-contain ${!source || imageError ? "invisible" : ""}`} />
         {(!source || imageError) && <p role={imageError ? "alert" : "status"} className="absolute inset-0 flex items-center justify-center p-6 text-sm text-muted-foreground text-center">{imageError || "Caricamento dell’anteprima…"}</p>}
       </div>
+      {layoutWarning && <p role="status" className="text-sm leading-relaxed text-muted-foreground">{layoutWarning}</p>}
 
       <div className="flex flex-col gap-5">
         <div data-tour="studio-presets">

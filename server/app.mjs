@@ -5,15 +5,17 @@ import { readFileSync, existsSync, statSync, unlinkSync } from 'node:fs';
 import { join, resolve, sep, extname } from 'node:path';
 import { loadConfig } from './config.mjs';
 import { openStore, fail, now, uid, safeUser, postRecord, digest, hashPassword, checkPassword, transaction } from './store.mjs';
-import { saveImage, ownedImage } from './files.mjs';
+import { saveImage, ownedImage, ownedFile, saveFont } from './files.mjs';
+import { validateBrand, validateDesign, validatePlanning } from './design.mjs';
+import { getTemplate, defaultDesign } from '../shared/templates.mjs';
 import { createIntegrations } from './integrations.mjs';
 import { aiPricingSettings, withAiCosts } from './ai-pricing.mjs';
 import { instant, editablePost, planPost, cancelSchedule } from './editorial.mjs';
 import { postDownload } from './zip.mjs';
 import { sessionToken, isNativeRequest, mobileRequestPolicy } from './mobile-access.mjs';
 
-const profileFields = ['company_name','company_field','brand_identity','tone_of_voice','company_logo_url','setup_completed'];
-const postFields = ['title','image_url','original_image_url','graphic_url','editor_filters','editor_preset','headline','caption','hashtags','context','platform','format','mode','tone','quality','company_name','status'];
+const profileFields = ['company_name','company_field','brand_identity','tone_of_voice','company_logo_url','setup_completed','brand_settings','preferred_template'];
+const postFields = ['title','image_url','original_image_url','graphic_url','editor_filters','editor_preset','headline','caption','hashtags','context','platform','format','mode','tone','quality','company_name','status','design','planning','editorial_at','graphic_subtitle'];
 const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 const emailValue = value => {
   const email = typeof value === 'string' ? value.trim().toLowerCase() : '';
@@ -129,13 +131,21 @@ export async function createApp(options = {}) {
     if (Object.keys(body).some(key => !postFields.includes(key))) fail(400,'Il post contiene campi non modificabili.');
     const data = { platform: 'instagram', mode:'original', tone:'amichevole', status:'pronto', ...previous };
     for (const [key, value] of Object.entries(body)) {
+      if (key === 'planning') { data.planning = validatePlanning(value); continue; }
+      if (key === 'design') { data.design = await validateDesign(db, config, user, value, JSON.parse(user.profile)); data.format = data.design.format; continue; }
+      if (key === 'editorial_at') { data.editorial_at = value === null ? null : instant(value); continue; }
       if (typeof value !== 'string' || value.length > 10000) fail(400, 'Campo del post non valido: ' + key);
       data[key] = value;
     }
     if (!['instagram','facebook','tiktok'].includes(data.platform)) fail(400,'Piattaforma non valida.');
     if (body.status && !['pronto','bozza'].includes(body.status)) fail(400,'Lo stato di pubblicazione viene gestito dal server.');
     if (!['original','enhance','creative'].includes(data.mode)) fail(400,'Modalita non valida.');
-    (await ownedImage(db,config,user,data.image_url));
+    if ('editorial_at' in body && !data.planning) fail(400, 'Usa la pianificazione del post per modificarne la data.');
+    if (data.planning && !data.design) data.design = await validateDesign(db, config, user, defaultDesign(JSON.parse(user.profile)));
+    if (data.planning && body.original_image_url) data.planning = { ...data.planning, stage: 'materiale_disponibile' };
+    if (data.planning && !data.image_url) { data.status = 'bozza'; data.title = data.planning.topic; }
+    else await ownedImage(db,config,user,data.image_url);
+    if (data.design) data.format = data.design.format;
     if (data.original_image_url) (await ownedImage(db,config,user,data.original_image_url));
     if (data.graphic_url) (await ownedImage(db,config,user,data.graphic_url));
     if (data.editor_filters) {
@@ -152,6 +162,7 @@ export async function createApp(options = {}) {
     const row = (await getPost(body.post_id,user));
     if (row.user_id !== user.id) fail(403,'Puoi programmare solo i tuoi post.');
     const data = JSON.parse(row.data);
+    if (!data.image_url) fail(409, 'Genera e salva il post dalla bozza prima di programmarne l’invio.');
     if (data.status === 'in_pubblicazione') fail(409,'Pubblicazione gia in corso.');
     if (data.status === 'pubblicato') fail(409,'Questo post risulta già pubblicato.');
     if (data.platform !== 'facebook') fail(400,'La pubblicazione automatica e disponibile solo per le Pagine Facebook.');
@@ -194,6 +205,7 @@ export async function createApp(options = {}) {
       else if (action === 'cancel-schedule' && method === 'POST') cancelSchedule(data);
       else if (action === 'mark-published' && method === 'POST') {
         editablePost(data);
+        if (!data.image_url) fail(409, 'La bozza non contiene ancora un post da pubblicare.');
         Object.assign(data,{status:'pubblicato',publication_method:'manual',published_at:now(),editorial_at:data.editorial_at || now()});
         delete data.scheduled_at; delete data.social_page_id; delete data.schedule_error;
       } else fail(405,'Operazione non consentita.');
@@ -253,6 +265,8 @@ export async function createApp(options = {}) {
       if (Object.keys(body).some(k => !profileFields.includes(k))) fail(403,'Puoi modificare solo i dati del profilo aziendale.');
       const profile = JSON.parse(user.profile);
       for (const [key,value] of Object.entries(body)) {
+        if (key === 'brand_settings') { profile[key] = await validateBrand(db, config, user, value); continue; }
+        if (key === 'preferred_template') { try { profile[key] = getTemplate(value).id; } catch (e) { fail(400, e.message); } continue; }
         if (key === 'setup_completed') { if (typeof value !== 'boolean') fail(400,'Stato configurazione non valido.'); profile[key]=value; continue; }
         if (typeof value !== 'string' || value.length > 5000) fail(400,'Campo profilo non valido.');
         if (key === 'company_logo_url' && value) (await ownedImage(db,config,user,value));
@@ -262,12 +276,16 @@ export async function createApp(options = {}) {
       if (!changed.changes) fail(409,'Il profilo è cambiato. Aggiorna e riprova.');
       return safeUser((await db.prepare('SELECT * FROM users WHERE id=?').get(user.id)));
     }
+    if (path === '/api/fonts' && method === 'POST') {
+      const user = await requiredUser(req); rateLimit(req, 'upload', 100);
+      return saveFont(db, config, user, await bodyBuffer(req, 5 * 1024 * 1024), req.headers['x-file-name'] ? decodeURIComponent(req.headers['x-file-name']) : 'carattere');
+    }
     if (path === '/api/files' && method === 'POST') {
       const user = (await requiredUser(req)); rateLimit(req,'upload',100);
       return (await saveImage(db,config,user,await bodyBuffer(req,15*1024*1024), req.headers['x-file-name'] ? decodeURIComponent(req.headers['x-file-name']) : 'immagine'));
     }
     if (/^\/api\/files\/[a-f0-9-]{36}$/.test(path) && method === 'GET') {
-      const image = (await ownedImage(db,config,(await requiredUser(req)),path));
+      const image = (await ownedFile(db,config,(await requiredUser(req)),path));
       res.writeHead(200, { 'Content-Type':image.mime, 'Cache-Control':'private, no-store', 'Content-Length':image.bytes.length }); res.end(image.bytes); return;
     }
     const entity = path.match(/^\/api\/entities\/(Post|User|AiLog)(?:\/([a-f0-9-]{36}))?$/);
@@ -384,7 +402,7 @@ export async function createApp(options = {}) {
     if (!target.startsWith(dist+sep)) target=join(dist,'index.html');
     if (!existsSync(target) || !statSync(target).isFile()) target=join(dist,'index.html');
     if (!existsSync(target)) fail(503,'Avvia npm run dev oppure esegui prima npm run build.');
-    const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript','.css':'text/css','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml','.woff2':'font/woff2','.ico':'image/x-icon'};
+    const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript','.css':'text/css','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml','.woff2':'font/woff2','.ttf':'font/ttf','.otf':'font/otf','.ico':'image/x-icon'};
     res.writeHead(200,{'Content-Type':mime[extname(target)] || 'application/octet-stream','Cache-Control':path.startsWith('/assets/') && extname(target) !== '.html' ? 'public, max-age=86400' : 'no-cache'}); res.end(method==='HEAD' ? undefined : readFileSync(target));
   }
   const server=createServer(async (req,res) => {

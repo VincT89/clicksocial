@@ -41,6 +41,7 @@ export const api = {
   entities: { Post: entity('Post'), User: entity('User'), AiLog: entity('AiLog') },
   functions: { invoke: async (name, data = {}) => ({ data: await send('/functions/' + name, data) }) },
   integrations: { Core: { UploadFile: async ({ file }) => isNative ? nativeUpload(file) : request('/files', { method: 'POST', headers: { 'Content-Type': file.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(file.name || 'immagine') }, body: file }) } },
+  brand: { uploadFont: file => isNative ? nativeUpload(file, 'font') : request('/fonts', { method: 'POST', headers: { 'Content-Type': file.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(file.name) }, body: file }) },
   social: { connect: async () => { if (isNative) throw new Error('Per questo collaudo collega Facebook dal browser sul PC, poi riapri il Profilo nell’app.'); return (await send('/oauth/facebook/start', { returnTo: '/profilo' })).url; }, disconnect: () => send('/social/disconnect') },
   editorial: {
     plan: (id, data) => send('/posts/' + encodeURIComponent(id) + '/plan', data, 'PATCH'),

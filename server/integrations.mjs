@@ -4,6 +4,9 @@ import { fail, now, uid, encrypt, decrypt, digest, transaction } from './store.m
 import { ownedImage, saveImage, sniffImage } from './files.mjs';
 import { resolveLogoAnalysis } from '../src/lib/logoPlacement.js';
 import { aiResponseMetadata, pricedAiLog } from './ai-pricing.mjs';
+import { validateDesign } from './design.mjs';
+import { designBrief, imageRequestSize, getTemplate } from '../shared/templates.mjs';
+import { editablePost } from './editorial.mjs';
 
 export function createIntegrations(db, config, fetchImpl = fetch) {
   async function jsonFetch(url, options = {}, onResponse) {
@@ -64,13 +67,22 @@ export function createIntegrations(db, config, fetchImpl = fetch) {
     const image = (await ownedImage(db, config, user, body.file_url));
     const record = (await db.prepare('SELECT * FROM users WHERE id=?').get(user.id));
     if (!record) fail(401, 'Account non più disponibile.');
+    const company = JSON.parse(record.profile);
+    let draft;
+    if (body.draft_id) {
+      const row = await db.prepare('SELECT * FROM posts WHERE id=? AND user_id=?').get(body.draft_id, user.id);
+      if (!row) fail(404, 'Bozza non trovata.');
+      draft = JSON.parse(row.data); editablePost(draft);
+    }
+    const designInput = body.design || draft?.design;
+    const design = designInput ? await validateDesign(db, config, user, designInput, company) : null;
+    const brief = design ? designBrief(design) : null;
     let reserved = false;
     if (record.plan !== 'pro') {
       reserved = (await db.prepare('UPDATE users SET ai_used=ai_used+1 WHERE id=? AND ai_used<2').run(user.id)).changes === 1;
       if (!reserved) fail(402, 'Hai usato le 2 generazioni gratuite. Passa a Pro per continuare.', 'limit_reached');
     }
     const started = Date.now();
-    const company = JSON.parse(record.profile);
     let imageAttempted = false, imageGenerated = false, logoPlacement;
     const calls = [];
     const usageLog = () => {
@@ -89,7 +101,9 @@ export function createIntegrations(db, config, fetchImpl = fetch) {
     const prompt = [
       'Sei un copywriter per il mercato italiano. Analizza la foto e non inventare dettagli non visibili o non forniti.',
       'Scrivi un post per ' + platform + ' con tono ' + tone + '.',
-      'Informazioni fornite sul brand: ' + JSON.stringify(company),
+      'Informazioni fornite sul brand: ' + JSON.stringify(design ? { company_name: company.company_name, company_field: company.company_field, brand_identity: company.brand_identity, tone_of_voice: company.tone_of_voice } : company),
+      draft?.planning ? 'Bozza editoriale salvata. Usa obiettivo, appunti e testo provvisorio; gli scatti richiesti sono indicazioni di preparazione, non fatti già visibili nella foto: ' + JSON.stringify(draft.planning) : '',
+      brief ? 'Template applicato dall’app: ' + JSON.stringify(brief) + '. Scrivi anche un sottotitolo breve, oppure una stringa vuota se non serve. Il testo deve rispettare gli spazi disponibili.' : '',
       'Richiesta specifica: ' + context,
       'La richiesta deve essere coerente con titolo e caption. Scrivi in italiano, senza emoji.',
       'headline: un solo messaggio, massimo 5 parole e 60 caratteri, comprensibile da solo e adatto a essere letto su smartphone. Non trasformarlo in una frase lunga né in un elenco.',
@@ -97,25 +111,43 @@ export function createIntegrations(db, config, fetchImpl = fetch) {
     ].join('\n');
     try {
       // Verifica il logo salvato prima di avviare le chiamate a pagamento.
-      const logo = mode !== 'original' && company.company_logo_url
+      const logo = !design && mode !== 'original' && company.company_logo_url
         ? await ownedImage(db, config, user, company.company_logo_url) : null;
       const output = await textResponse('copy', {
           input: [{ role: 'user', content: [{ type: 'input_text', text: prompt }, { type: 'input_image', image_url: 'data:' + image.mime + ';base64,' + image.bytes.toString('base64') }] }],
-          text: { format: { type: 'json_schema', name: 'social_copy', strict: true, schema: { type: 'object', properties: { headline: { type: 'string' }, caption: { type: 'string' }, hashtags: { type: 'string' } }, required: ['headline','caption','hashtags'], additionalProperties: false } } },
+          text: { format: { type: 'json_schema', name: 'social_copy', strict: true, schema: { type: 'object', properties: { headline: { type: 'string' }, caption: { type: 'string' }, hashtags: { type: 'string' }, ...(design ? { graphic_subtitle: { type: 'string' } } : {}) }, required: ['headline','caption','hashtags', ...(design ? ['graphic_subtitle'] : [])], additionalProperties: false } } },
       });
       const text = (output.output || []).flatMap(item => item.content || []).filter(item => item.type === 'output_text').map(item => item.text).join('');
       let result;
       try { result = JSON.parse(text); } catch { fail(502, 'Il servizio AI non ha restituito un post valido.'); }
       if (!['headline','caption','hashtags'].every(k => typeof result[k] === 'string')) fail(502, 'Risposta AI incompleta.');
+      if (design) {
+        const template = getTemplate(design.template_id, design.template_version);
+        if (typeof result.graphic_subtitle !== 'string' || result.headline.length > template.maxHeadline || result.graphic_subtitle.length > brief.max_subtitle) fail(502, 'Il testo generato supera lo spazio del template. Accorcia la richiesta e riprova.');
+      }
       let graphicUrl;
       if (mode !== 'original') {
         imageAttempted = true;
         const form = new FormData();
         form.set('model', config.imageModel);
         form.set('image', new Blob([image.bytes], { type: image.mime }), image.name);
-        form.set('size', '1024x1024');
+        form.set('size', imageRequestSize(design, config.imageModel));
         form.set('n', '1');
-        form.set('prompt', [
+        form.set('prompt', design ? [
+          mode === 'enhance' ? 'Ritocca la fotografia mantenendo il soggetto, l’identità e i dettagli reali. Migliora luce e colore in modo naturale.' : 'Crea una fotografia editoriale coerente con il soggetto originale e il brand. Conserva identità e dettagli riconoscibili.',
+          'Genera SOLO la parte fotografica. Il template, i testi e il logo verranno composti separatamente da ClickSocial.',
+          'Non aggiungere titoli, sottotitoli, scritte, loghi, cornici, watermark o segnaposto. Mantieni le scritte reali già presenti su oggetti e prodotti senza inventarne altre.',
+          brief.reserved_areas
+            ? 'La foto deve riempire tutto il fotogramma. ClickSocial sovrapporrà titolo, sottotitolo e logo nelle reserved_areas: mantieni queste zone e i loro margini semplici e visivamente tranquilli, con sfondo fotografico continuo. Non collocarvi volti, prodotti, scritte reali o dettagli importanti. Nessun pannello, fascia, cornice, collage o riquadro visibile. Concentra il soggetto importante nella subject_area, rispettando l’arrangement indicato. Le coordinate si riferiscono alla foto intera. Non disegnare i testi o il logo e non trasformare gli spazi liberi in rettangoli vuoti.'
+            : 'Non creare aree vuote per il testo all’interno della fotografia: i testi verranno applicati fuori dall’area fotografica.',
+          'Brief del template e palette aziendale in HEX: ' + JSON.stringify(brief),
+          'Brand: ' + JSON.stringify({ nome: company.company_name || '', settore: company.company_field || '', identità: company.brand_identity || '' }),
+          'Messaggio che accompagnerà la foto, da NON scrivere nell’immagine: ' + JSON.stringify(result.headline),
+          'Indicazioni specifiche: ' + context,
+          draft?.planning ? 'Brief editoriale: ' + JSON.stringify(draft.planning) : '',
+          'La foto occuperà l’intera area fotografica del template. Inquadra il soggetto con margine sufficiente per piccoli ritagli, preservando volti e dettagli importanti. Segui il rapporto dell’area fotografica indicato nel brief.',
+          'Usa la palette come direzione cromatica, conservando colori reali di prodotti, pelle e marchi. Non inventare prodotti, prezzi, servizi, eventi o promesse.',
+        ].filter(Boolean).join('\n') : [
           mode === 'enhance'
             ? 'Ritocca la foto mantenendo soggetto, identità e composizione riconoscibili. Migliora luce e colore in modo naturale.'
             : 'Crea una grafica social editoriale coerente con la foto e il brand. Conserva il soggetto riconoscibile.',
@@ -187,7 +219,7 @@ export function createIntegrations(db, config, fetchImpl = fetch) {
         }
       }
       (await logAi(user, { operation: 'generateCopy', company_name: company.company_name || '', platform, mode, tone, status: 'success', ...usageLog(), latency_ms: Date.now() - started, image_attempted:imageAttempted, image_model:imageAttempted ? config.imageModel : null, image_generated:imageGenerated, ...(logoPlacement ? { logo_placement:logoPlacement } : {}) }, calls));
-      return { ...result, graphic_url: graphicUrl, ...(logoPlacement ? { logo_url:company.company_logo_url, logo_placement:logoPlacement } : {}) };
+      return { ...result, graphic_url: graphicUrl, ...(design ? { design } : {}), ...(logoPlacement ? { logo_url:company.company_logo_url, logo_placement:logoPlacement } : {}) };
     } catch (error) {
       if (reserved) (await db.prepare(SQL.refundAI).run(user.id));
       (await logAi(user, { operation: 'generateCopy', company_name:company.company_name || '', platform, mode, tone, status: 'error', error: error.message, ...usageLog(), image_attempted:imageAttempted, image_model:imageAttempted ? config.imageModel : null, image_generated:imageGenerated, latency_ms: Date.now() - started }, calls));

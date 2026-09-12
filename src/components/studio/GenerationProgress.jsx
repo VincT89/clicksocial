@@ -36,6 +36,8 @@ export default function GenerationProgress() {
   };
   const detail = generationStage === 'logo'
     ? 'Prepariamo il logo senza sfondo e lo inseriamo nello spazio scelto per la grafica.'
+    : generationStage === 'template'
+    ? 'Impaginiamo foto, testi e logo con il template e i caratteri aziendali.'
     : 'Stiamo lavorando al contenuto. L’anteprima comparirà appena il post sarà pronto.';
 
   return <>

@@ -33,10 +33,13 @@ export function StudioStateProvider({ children }) {
   const [activePreset, setActivePreset] = useState("Originale");
   const [editingId, setEditingId] = useState(null);
   const [postStatus, setPostStatus] = useState('bozza');
+  const [design, setDesign] = useState(null);
+  const [planning, setPlanning] = useState(null);
+  const [editorialAt, setEditorialAt] = useState(null);
 
   const persist = record => {
     if (!record?.key) return;
-    storageQueue.current = storageQueue.current.catch(() => {}).then(() => record.data.originalUrl
+    storageQueue.current = storageQueue.current.catch(() => {}).then(() => record.data.originalUrl || record.data.planning
       ? Preferences.set({ key: record.key, value: JSON.stringify({ version: 1, ...record.data }) })
       : Preferences.remove({ key: record.key })).catch(() => {
       if (!storageWarning.current) toast.error('Non riesco a conservare la bozza sul dispositivo. Salva il post nella Libreria prima di chiudere.');
@@ -53,6 +56,7 @@ export function StudioStateProvider({ children }) {
     setOriginalUrl(null); setPlatform('Instagram'); setTone('amichevole'); setMode('original');
     setTitle(''); setContext(''); setCopy(null); setFilters({ ...DEFAULT_FILTERS });
     setActivePreset('Originale'); setEditingId(null); setPostStatus('bozza'); setGenerating(false);
+    setDesign(null); setPlanning(null); setEditorialAt(null);
     storageQueue.current.then(() => Preferences.get({ key: storageKey })).then(({ value }) => {
       if (!active) return;
       const saved = restoreStudioDraft(value, DEFAULT_FILTERS);
@@ -60,6 +64,7 @@ export function StudioStateProvider({ children }) {
         setOriginalUrl(saved.originalUrl); setPlatform(saved.platform); setTone(saved.tone); setMode(saved.mode);
         setTitle(saved.title); setContext(saved.context); setCopy(saved.copy); setFilters(saved.filters);
         setActivePreset(saved.activePreset); setEditingId(saved.editingId); setPostStatus(saved.postStatus);
+        setDesign(saved.design); setPlanning(saved.planning); setEditorialAt(saved.editorialAt);
       }
     }).catch(() => toast.error('Non riesco a recuperare la bozza sul dispositivo.')).finally(() => { if (active) setHydratedKey(storageKey); });
     return () => { active = false; };
@@ -67,11 +72,11 @@ export function StudioStateProvider({ children }) {
 
   useEffect(() => {
     if (!isNative || !ready || !storageKey) return;
-    const record = { key: storageKey, data: { originalUrl, platform, tone, mode, title, context, copy, filters, activePreset, editingId, postStatus } };
+    const record = { key: storageKey, data: { originalUrl, platform, tone, mode, title, context, copy, filters, activePreset, editingId, postStatus, design, planning, editorialAt } };
     latestDraft.current = record;
     const timer = setTimeout(() => persist(record), 200);
     return () => clearTimeout(timer);
-  }, [ready, storageKey, originalUrl, platform, tone, mode, title, context, copy, filters, activePreset, editingId, postStatus]);
+  }, [ready, storageKey, originalUrl, platform, tone, mode, title, context, copy, filters, activePreset, editingId, postStatus, design, planning, editorialAt]);
 
   useEffect(() => {
     if (!isNative) return;
@@ -91,6 +96,7 @@ export function StudioStateProvider({ children }) {
     setActivePreset("Originale");
     setEditingId(null);
     setPostStatus('bozza');
+    setDesign(null); setPlanning(null); setEditorialAt(null);
   };
 
   return (
@@ -124,6 +130,7 @@ export function StudioStateProvider({ children }) {
         draftRevision,
         postStatus,
         setPostStatus,
+        design, setDesign, planning, setPlanning, editorialAt, setEditorialAt,
       }}
     >
       {ready ? children : <p role="status" className="p-6 text-sm text-muted-foreground">Recupero della bozza…</p>}
