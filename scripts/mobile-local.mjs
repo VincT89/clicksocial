@@ -15,6 +15,7 @@ try {
 } catch (error) {
   await app.close();
   if (error.code === 'EADDRINUSE') console.error('La porta di collaudo è già occupata. Non è stata avviata una seconda istanza.');
+  else if (error.code === 'EADDRNOTAVAIL') console.error('L’indirizzo di collaudo ' + url.hostname + ' non è assegnato a questo PC. Verifica l’indirizzo della rete Wi-Fi prima di aggiornare la configurazione; anche la build sul telefono deve usare lo stesso indirizzo.');
   else console.error(error.message);
   process.exitCode = 1;
 }

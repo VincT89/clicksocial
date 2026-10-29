@@ -42,7 +42,17 @@ export const api = {
   functions: { invoke: async (name, data = {}) => ({ data: await send('/functions/' + name, data) }) },
   integrations: { Core: { UploadFile: async ({ file }) => isNative ? nativeUpload(file) : request('/files', { method: 'POST', headers: { 'Content-Type': file.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(file.name || 'immagine') }, body: file }) } },
   brand: { uploadFont: file => isNative ? nativeUpload(file, 'font') : request('/fonts', { method: 'POST', headers: { 'Content-Type': file.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(file.name) }, body: file }) },
-  social: { connect: async () => { if (isNative) throw new Error('Per questo collaudo collega Facebook dal browser sul PC, poi riapri il Profilo nell’app.'); return (await send('/oauth/facebook/start', { returnTo: '/profilo' })).url; }, disconnect: () => send('/social/disconnect') },
+  social: {
+    status: () => request('/social/status'),
+    connect: provider => send('/social/' + encodeURIComponent(provider) + '/connect'),
+    disconnect: provider => send('/social/' + encodeURIComponent(provider) + '/disconnect'),
+    flow: id => request('/social/flows/' + encodeURIComponent(id)),
+    confirm: (id, account_ids) => send('/social/flows/' + encodeURIComponent(id) + '/confirm', { account_ids }),
+    cancel: id => send('/social/flows/' + encodeURIComponent(id) + '/cancel'),
+    prepare: id => request('/social/posts/' + encodeURIComponent(id) + '/prepare'),
+    publish: data => send('/social/publish', data),
+    resolve: (id, outcome) => send('/social/posts/' + encodeURIComponent(id) + '/resolve', { checked: true, outcome }),
+  },
   editorial: {
     plan: (id, data) => send('/posts/' + encodeURIComponent(id) + '/plan', data, 'PATCH'),
     cancelSchedule: id => send('/posts/' + encodeURIComponent(id) + '/cancel-schedule'),

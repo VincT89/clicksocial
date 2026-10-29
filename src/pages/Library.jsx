@@ -72,6 +72,7 @@ export default function Library() {
       if (action.type === 'delete') { await api.entities.Post.delete(action.post.id); setPosts(current => current.filter(p => p.id !== action.post.id)); toast.success('Post eliminato'); }
       if (action.type === 'cancel') { update(await api.editorial.cancelSchedule(action.post.id)); toast.success('Invio automatico annullato. La data editoriale resta nel calendario.'); }
       if (action.type === 'published') { update(await api.editorial.markPublished(action.post.id)); toast.success('Pubblicazione manuale registrata'); }
+      if (['resolvePublished','resolveMissing'].includes(action.type)) { await api.social.resolve(action.post.id, action.type === 'resolvePublished' ? 'published' : 'not_published'); await load(); toast.success('Esito registrato'); }
       setAction(null);
     } catch (e) { toast.error(e.message); await load(); }
     finally { setBusy(false); }
@@ -89,7 +90,9 @@ export default function Library() {
   const planSaved = saved => { update(saved); setView(editorialDate(saved) ? window.matchMedia('(max-width: 767px)').matches ? 'agenda' : 'calendar' : 'unscheduled'); };
   const actionText = {
     delete: ['Eliminare questo post?', 'Il contenuto verrà rimosso definitivamente dalla Libreria e dal calendario.', 'Elimina post'],
-    cancel: ['Annullare l’invio automatico?', 'Il post non verrà più inviato a Facebook. La data resta come promemoria nel piano editoriale.', 'Annulla invio'],
+    cancel: ['Annullare l’invio automatico?', 'Il post non verrà più inviato al social. La data resta come promemoria nel piano editoriale.', 'Annulla invio'],
+    resolvePublished: ['Hai trovato il post sul social?', 'Confermi di aver verificato che il contenuto è stato pubblicato sull’account scelto. Non verrà inviato di nuovo.', 'Confermo: è pubblicato'],
+    resolveMissing: ['Hai verificato che il post non è presente?', 'Controlla anche i contenuti in elaborazione sul social. Questa conferma sblocca il post per un eventuale nuovo invio, che dovrai richiedere tu.', 'Confermo: non è pubblicato'],
     published: ['Hai pubblicato questo contenuto?', 'Confermi una pubblicazione che hai già effettuato sui social. ClickSocial registra lo stato senza inviare il contenuto e il post diventa di sola lettura.', 'Conferma pubblicazione manuale'],
   }[action?.type];
   return <div className="min-h-screen bg-background">
@@ -127,7 +130,7 @@ export default function Library() {
       {posts === null && !error && <p role="status" className="text-sm">Caricamento dei contenuti…</p>}
       {posts?.length === 0 ? <section className="rounded-xl border border-dashed border-border px-5 py-12 text-center"><h2 className="font-heading text-xl">Prepara il prossimo contenuto</h2><p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">Puoi partire da una bozza, anche senza foto, oppure creare subito un post nello Studio.</p><Button className="mt-5" onClick={() => setDraft({})}>Crea una bozza editoriale</Button></section>
       : posts && !filtered.length ? <section className="rounded-xl border border-dashed border-border p-8 text-center"><h2 className="font-heading text-lg">Nessun post corrisponde alla ricerca</h2><p className="mt-2 text-sm text-muted-foreground">Prova un altro testo oppure azzera i filtri.</p></section>
-      : posts && view === 'agenda' ? <section aria-label="Agenda delle pubblicazioni" className="space-y-6">{agenda.length ? agenda.map(([day, items]) => <section key={day} className="space-y-3"><h2 className="font-heading text-lg">{new Date(day + 'T12:00:00').toLocaleDateString('it-IT', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}</h2><div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">{items.map(p => card(p))}</div></section>) : <p className="text-sm text-muted-foreground">Non ci sono ancora contenuti con una data prevista.</p>}{unscheduled.length > 0 && <Button variant="outline" onClick={() => setView('unscheduled')}>Apri i contenuti senza data</Button>}</section>
+      : posts && view === 'agenda' ? <section aria-label="Agenda delle pubblicazioni" className="space-y-6">{agenda.length ? agenda.map(([day, items]) => <section key={day} className="space-y-3"><h2 className="font-heading text-lg">{new Date(day + 'T12:00:00').toLocaleDateString('it-IT', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}</h2><div className="grid auto-rows-fr sm:grid-cols-2 xl:grid-cols-3 gap-4">{items.map(p => card(p))}</div></section>) : <p className="text-sm text-muted-foreground">Non ci sono ancora contenuti con una data prevista.</p>}{unscheduled.length > 0 && <Button variant="outline" onClick={() => setView('unscheduled')}>Apri i contenuti senza data</Button>}</section>
       : posts && view === 'calendar' ? <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-5 items-start">
           <EditorialCalendar month={month} setMonth={setMonth} selected={selected} onSelect={setSelected} byDay={byDay} />
           <section data-tour="library-agenda" aria-labelledby="agenda-title" className="min-w-0 rounded-xl border border-border bg-card px-4">
@@ -136,7 +139,7 @@ export default function Library() {
           </section>
         </div> : posts && <section aria-label={view === 'unscheduled' ? 'Post da pianificare' : 'Tutti i post'}>
           <p className="text-sm text-muted-foreground mb-4" role="status">{view === 'unscheduled' ? visiblePosts.length ? visiblePosts.length + (visiblePosts.length === 1 ? ' contenuto senza data. Scegli Pianifica per inserirlo nel calendario.' : ' contenuti senza data. Scegli Pianifica per inserirli nel calendario.') : hasFilters ? 'Nessun contenuto senza data con i filtri attuali.' : 'Tutti i contenuti hanno una data.' : visiblePosts.length + (view === 'drafts' ? visiblePosts.length === 1 ? ' bozza in preparazione' : ' bozze in preparazione' : visiblePosts.length === 1 ? ' contenuto salvato' : ' contenuti salvati')}</p>
-          {view === 'drafts' && !visiblePosts.length && <p className="text-sm text-muted-foreground mb-4">Nessuna bozza in preparazione con i filtri attuali.</p>}<div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">{visiblePosts.map(p => card(p))}</div>
+          {view === 'drafts' && !visiblePosts.length && <p className="text-sm text-muted-foreground mb-4">Nessuna bozza in preparazione con i filtri attuali.</p>}<div className="grid auto-rows-fr sm:grid-cols-2 xl:grid-cols-3 gap-4">{visiblePosts.map(p => card(p))}</div>
         </section>}
     </main>
     {plan && <PlanDialog key={plan.id} post={plan} selectedDay={selected} onClose={() => setPlan(null)} onSaved={planSaved} />}

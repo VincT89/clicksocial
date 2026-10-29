@@ -13,6 +13,7 @@ import { aiPricingSettings, withAiCosts } from './ai-pricing.mjs';
 import { instant, editablePost, planPost, cancelSchedule } from './editorial.mjs';
 import { postDownload } from './zip.mjs';
 import { sessionToken, isNativeRequest, mobileRequestPolicy } from './mobile-access.mjs';
+import { createClientAddressResolver } from './client-address.mjs';
 
 const profileFields = ['company_name','company_field','brand_identity','tone_of_voice','company_logo_url','setup_completed','brand_settings','preferred_template'];
 const postFields = ['title','image_url','original_image_url','graphic_url','editor_filters','editor_preset','headline','caption','hashtags','context','platform','format','mode','tone','quality','company_name','status','design','planning','editorial_at','graphic_subtitle'];
@@ -25,11 +26,12 @@ const emailValue = value => {
 
 export async function createApp(options = {}) {
   const config = loadConfig(options);
+  const clientAddress = createClientAddressResolver(config.proxyMode);
   const db = (await openStore(config));
   const integrations = createIntegrations(db, config, options.fetchImpl);
   const limits = new Map();
-  function rateLimit(req, tag, max = 30) {
-    const key = req.socket.remoteAddress + ':' + tag;
+  function rateLimit(req, tag, max = 30, user = null) {
+    const key = (user ? 'user:' + user.id : 'ip:' + clientAddress(req)) + ':' + tag;
     const current = limits.get(key);
     const window = !current || current.expires < Date.now() ? { count: 0, expires: Date.now()+600000 } : current;
     if (++window.count > max) fail(429, 'Troppi tentativi. Attendi qualche minuto e riprova.');
@@ -163,8 +165,9 @@ export async function createApp(options = {}) {
     if (row.user_id !== user.id) fail(403,'Puoi programmare solo i tuoi post.');
     const data = JSON.parse(row.data);
     if (!data.image_url) fail(409, 'Genera e salva il post dalla bozza prima di programmarne l’invio.');
-    if (data.status === 'in_pubblicazione') fail(409,'Pubblicazione gia in corso.');
+    if (['in_pubblicazione','da_verificare'].includes(data.status)) fail(409,'Attendi o verifica l’esito della pubblicazione precedente.');
     if (data.status === 'pubblicato') fail(409,'Questo post risulta già pubblicato.');
+    if (data.social_job) fail(409,'Per modificare questo invio usa Pubblica foto nella versione aggiornata di ClickSocial.');
     if (data.platform !== 'facebook') fail(400,'La pubblicazione automatica e disponibile solo per le Pagine Facebook.');
     const when = new Date(instant(body.scheduled_at));
     if (!Number.isFinite(when.getTime()) || when.getTime() <= Date.now()) fail(400,'Scegli una data futura.');
@@ -180,7 +183,61 @@ export async function createApp(options = {}) {
   async function route(req,res,url) {
     const path = url.pathname;
     const method = req.method;
-    if (path === '/api/health' && method === 'GET') return { ok:true, database:!!(await db.prepare('SELECT 1 AS ok').get()).ok, database_driver:db.kind, backend:'local' };
+    const social = integrations.social;
+    const flowCookie = id => 'clicksocial_social_' + String(id || '').slice(0, 16);
+    if (path === '/api/social/status' && method === 'GET') return social.status(await requiredUser(req), true);
+    if (path === '/api/social/authorize' && method === 'GET') {
+      rateLimit(req, 'social-authorize', 60);
+      const id = url.searchParams.get('id');
+      const result = await social.authorize(id, url.searchParams.get('ticket'));
+      setCookie(res, flowCookie(id), result.browser, 900);
+      res.writeHead(302, { Location: result.url, 'Referrer-Policy': 'no-referrer' }); res.end(); return;
+    }
+    const socialCallback = path.match(/^\/api\/social\/(facebook|instagram|tiktok)\/callback$/);
+    if (socialCallback && method === 'GET') {
+      const id = url.searchParams.get('state');
+      let result;
+      try { result = await social.complete(socialCallback[1], id, cookie(req, flowCookie(id)), url.searchParams.get('code'), url.searchParams.has('error')); }
+      catch (error) { result = { message: error.status ? error.message : 'Collegamento non completato. Torna al Profilo e riprova.' }; }
+      setCookie(res, flowCookie(id), '', 0);
+      const back = result.id ? result.native ? 'it.sodanoconsulting.clicksocial://social-return?flow=' + result.id : '/profilo?section=social&social_flow=' + result.id : '/profilo?section=social';
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Referrer-Policy': 'no-referrer' });
+      res.end('<!doctype html><html lang="it"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Collegamento social - ClickSocial</title><style>body{font:18px/1.6 system-ui;max-width:36rem;margin:3rem auto;padding:0 1.5rem;overflow-wrap:anywhere}a{display:inline-block;padding:1rem 0;color:#5430a2}</style><h1>Collegamento social</h1><p>' + escapeHtml(result.message) + '</p><a href="' + escapeHtml(back) + '">Torna a ClickSocial</a><p>Puoi anche chiudere questa finestra e tornare al Profilo nell’app già aperta.</p></html>'); return;
+    }
+    const socialAction = path.match(/^\/api\/social\/(facebook|instagram|tiktok)\/(connect|disconnect)$/);
+    if (socialAction && method === 'POST') {
+      const user = await requiredUser(req);
+      rateLimit(req, 'social-connect', 60, user);
+      if (socialAction[2] === 'disconnect') return social.disconnect(user, socialAction[1]);
+      return social.begin(user, socialAction[1], isNativeRequest(req));
+    }
+    const socialFlow = path.match(/^\/api\/social\/flows\/([a-f0-9]{64})(?:\/(confirm|cancel))?$/);
+    if (socialFlow) {
+      const user = await requiredUser(req);
+      if (method === 'GET' && !socialFlow[2]) return social.flow(user, socialFlow[1]);
+      if (method === 'POST' && socialFlow[2] === 'confirm') return social.confirm(user, socialFlow[1], (await bodyJson(req)).account_ids);
+      if (method === 'POST' && socialFlow[2] === 'cancel') return social.cancel(user, socialFlow[1]);
+      fail(405, 'Operazione non consentita.');
+    }
+    const socialPost = path.match(/^\/api\/social\/posts\/([a-f0-9-]{36})\/(prepare|resolve)$/);
+    if (socialPost) {
+      const user = await requiredUser(req);
+      if (method === 'GET' && socialPost[2] === 'prepare') return integrations.publication.prepare(user, socialPost[1]);
+      if (method === 'POST' && socialPost[2] === 'resolve') return integrations.publication.resolve(user, socialPost[1], await bodyJson(req));
+      fail(405, 'Operazione non consentita.');
+    }
+    if (path === '/api/social/publish' && method === 'POST') {
+      const user = await requiredUser(req);
+      rateLimit(req, 'social-publish', 60, user);
+      return integrations.publication.enqueue(user, await bodyJson(req));
+    }
+    const socialMedia = path.match(/^\/api\/social\/media\/([a-f0-9-]{36})$/);
+    if (socialMedia && ['GET', 'HEAD'].includes(method)) {
+      const file = await integrations.publication.media(socialMedia[1], url.searchParams.get('expires'), url.searchParams.get('signature'));
+      res.writeHead(200, { 'Content-Type': file.mime, 'Content-Length': file.bytes.length, 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer' });
+      res.end(method === 'HEAD' ? undefined : file.bytes); return;
+    }
+    if (path === '/api/health' && method === 'GET') return { ok:true, database:!!(await db.prepare('SELECT 1 AS ok').get()).ok, database_driver:db.kind, backend:config.localMode ? 'local' : 'node' };
     if (path === '/api/settings' && method === 'GET') return (await settings());
     if (path === '/api/stripe/webhook' && method === 'POST') return integrations.stripeWebhook(await bodyBuffer(req), req.headers['stripe-signature']);
     if (path === '/api/auth/me' && method === 'GET') return safeUser((await requiredUser(req)));
@@ -277,11 +334,11 @@ export async function createApp(options = {}) {
       return safeUser((await db.prepare('SELECT * FROM users WHERE id=?').get(user.id)));
     }
     if (path === '/api/fonts' && method === 'POST') {
-      const user = await requiredUser(req); rateLimit(req, 'upload', 100);
+      const user = await requiredUser(req); rateLimit(req, 'upload', 100, user);
       return saveFont(db, config, user, await bodyBuffer(req, 5 * 1024 * 1024), req.headers['x-file-name'] ? decodeURIComponent(req.headers['x-file-name']) : 'carattere');
     }
     if (path === '/api/files' && method === 'POST') {
-      const user = (await requiredUser(req)); rateLimit(req,'upload',100);
+      const user = (await requiredUser(req)); rateLimit(req,'upload',100,user);
       return (await saveImage(db,config,user,await bodyBuffer(req,15*1024*1024), req.headers['x-file-name'] ? decodeURIComponent(req.headers['x-file-name']) : 'immagine'));
     }
     if (/^\/api\/files\/[a-f0-9-]{36}$/.test(path) && method === 'GET') {
@@ -313,7 +370,7 @@ export async function createApp(options = {}) {
         }
         if (method === 'DELETE' && id) {
           const row = await getPost(id,user);
-          if (['in_coda','in_pubblicazione'].includes(JSON.parse(row.data).status)) fail(409,'Annulla prima l’invio automatico o attendi il completamento.');
+          if (['in_coda','in_pubblicazione','da_verificare'].includes(JSON.parse(row.data).status)) fail(409,'Annulla prima l’invio automatico o verifica il suo esito.');
           if (!(await db.prepare('DELETE FROM posts WHERE id=? AND data=?').run(id,row.data)).changes) fail(409,'Il post è cambiato. Aggiorna e riprova.');
           return { ok:true };
         }
@@ -335,12 +392,7 @@ export async function createApp(options = {}) {
       fail(405,'Operazione non consentita.');
     }
     if (path === '/api/social/disconnect' && method === 'POST') {
-      const user=(await requiredUser(req));
-      (await transaction(db, async () => {
-        if (await db.prepare(`SELECT id FROM posts WHERE user_id=? AND ${db.json('status')}='in_pubblicazione'`).get(user.id)) fail(409,'Attendi il completamento dell’invio prima di scollegare Facebook.');
-        (await db.prepare('DELETE FROM social_connections WHERE user_id=?').run(user.id));
-        (await db.prepare(`UPDATE posts SET data=json_remove(json_set(data,'$.status','pronto','$.schedule_error','Collegamento Facebook rimosso'),'$.scheduled_at','$.social_page_id'),updated_at=? WHERE user_id=? AND ${db.json('status')}='in_coda'`).run(now(),user.id));
-      })); return { ok:true };
+      return social.disconnect(await requiredUser(req), 'facebook');
     }
     const oauthStart=path.match(/^\/api\/oauth\/(google|facebook)\/start$/);
     if (oauthStart && method === 'POST') {
@@ -369,9 +421,9 @@ export async function createApp(options = {}) {
     const fn=path.match(/^\/api\/functions\/([A-Za-z]+)$/);
     if (fn && method==='POST') {
       const user=(await requiredUser(req)); const body=await bodyJson(req);
-      if (fn[1]==='generateCopy') { rateLimit(req,'ai',60); return integrations.generateCopy(user,body); }
+      if (fn[1]==='generateCopy') { rateLimit(req,'ai',60,user); return integrations.generateCopy(user,body); }
       if (fn[1]==='aiStatus') { admin(user); return integrations.aiStatus(user); }
-      if (fn[1]==='createCheckout') { rateLimit(req,'checkout',10); return integrations.createCheckout(user); }
+      if (fn[1]==='createCheckout') { rateLimit(req,'checkout',10,user); return integrations.createCheckout(user); }
       if (fn[1]==='socialStatus') return integrations.socialStatus(user);
       if (fn[1]==='schedulePost') return schedulePost(user,body);
       if (fn[1]==='deleteUserAccount') {
@@ -423,7 +475,7 @@ export async function createApp(options = {}) {
     }
   });
   server.requestTimeout=150000;
-  const timer=options.scheduler===false ? null : setInterval(()=>integrations.publishDuePosts().catch(e=>console.error('Scheduler:',e.message)),300000);
+  const timer=config.scheduler===false ? null : setInterval(()=>integrations.publishDuePosts().catch(e=>console.error('Scheduler:',e.message)),30000);
   timer?.unref();
-  return {server,db,config,integrations, async close() { if(timer) clearInterval(timer); if(server.listening) await new Promise(resolve=>server.close(resolve)); (await db.close()); }};
+  return {server,db,config,integrations, async close() { if(timer) clearInterval(timer); if(server.listening) await new Promise(resolve=>server.close(resolve)); try { await integrations.publication.waitForIdle(); } finally { await db.close(); } }};
 }

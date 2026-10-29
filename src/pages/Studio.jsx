@@ -44,7 +44,7 @@ export default function Studio() {
   const [replacement, setReplacement] = useState(null);
   const id = params.get('id');
   const newRequested = params.get('new') === '1';
-  const locked = ['in_coda','in_pubblicazione','pubblicato'].includes(postStatus);
+  const locked = ['in_coda','in_pubblicazione','pubblicato','da_verificare'].includes(postStatus);
   useEffect(() => {
     alive.current = true;
     api.auth.me().then(account => { if (alive.current) setMe(account); }).catch(e => toast.error(e.message));

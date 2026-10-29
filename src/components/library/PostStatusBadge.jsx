@@ -9,6 +9,7 @@ export default function PostStatusBadge({ post }) {
     : "";
 
   if (post.status === "in_pubblicazione") return <span className="absolute bottom-3 left-3 bg-purple text-white px-3 py-1 text-sm">Pubblicazione in corso</span>;
+  if (post.status === "da_verificare") return <span className="absolute bottom-3 left-3 max-w-[85%] bg-background text-foreground border border-border px-3 py-1 text-sm">Esito da verificare sul social</span>;
 
   if (post.status === "in_coda") {
     return (

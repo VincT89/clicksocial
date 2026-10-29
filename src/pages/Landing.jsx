@@ -61,7 +61,7 @@ export default function Landing() {
               </h1>
               <p className="text-base sm:text-lg text-muted-foreground mt-5 max-w-md leading-relaxed">
                 Carica uno scatto, dagli il taglio giusto e costruisci un contenuto pronto per il
-                feed. Scaricalo per pubblicarlo sui social o programma l'invio a una Pagina Facebook collegata con il piano Pro.
+                feed. Scaricalo oppure, con Pro, invia e programma le foto su Facebook, Instagram e TikTok collegati e attivati dal gestore.
               </p>
               <div className="flex flex-wrap items-center gap-4 mt-8">
                 <Link

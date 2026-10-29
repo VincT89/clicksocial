@@ -1,7 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Camera, Compass, Send, ShieldCheck } from "lucide-react";
-import { useAuth } from "@/lib/AuthContext";
 
 const FLOW = [
   {
@@ -19,16 +18,16 @@ const FLOW = [
   {
     tag: "Output",
     title: "Pubblica dove vuoi",
-    text: "Scarica foto e testo. Con il piano Pro puoi programmare i post per una Pagina Facebook collegata.",
+    text: "Scarica foto e testo. Con Pro puoi inviare o programmare le foto sui social collegati e attivati dal gestore.",
     icon: Send,
   },
 ];
 
 const STEPS = [
   { title: "Apri il tuo profilo", text: "Entra nella sezione dedicata ai collegamenti social." },
-  { title: "Scegli il social", text: "Premi il pulsante per collegare la tua Pagina Facebook." },
-  { title: "Accedi e autorizza", text: "Effettua l'accesso su Meta e seleziona la tua Pagina Facebook." },
-  { title: "Crea e pubblica", text: "Scegli le destinazioni direttamente quando il post è pronto." },
+  { title: "Scegli il social", text: "Apri Facebook, Instagram o TikTok tra i collegamenti disponibili." },
+  { title: "Accedi e autorizza", text: "Accedi sul sito ufficiale del social e conferma l’account in ClickSocial." },
+  { title: "Crea e pubblica", text: "Controlla foto, testo e destinazione prima di confermare l’invio." },
 ];
 
 export function FlowSection() {
@@ -73,8 +72,6 @@ export function FlowSection() {
 }
 
 export function ConnectionsSection() {
-  const { appPublicSettings } = useAuth();
-  const facebookEnabled = appPublicSettings?.public_settings?.facebookEnabled;
   return (
     <section id="collega-profili" data-tour="connections" className="rounded-[28px] bg-card p-6 sm:p-10 pwa-shadow scroll-mt-20">
       <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
@@ -87,15 +84,15 @@ export function ConnectionsSection() {
           </h2>
           <div className="mt-5 space-y-3 text-sm text-muted-foreground leading-relaxed">
             <p>
-              Collega la tua Pagina Facebook dal tuo profilo ClickSocial usando il normale accesso
-              di Meta. Scegli tu quale account autorizzare.
+              Collega i social dal Profilo usando l’accesso sul sito ufficiale di ciascun servizio.
+              Scegli tu quale account autorizzare e confermalo prima di pubblicare.
             </p>
             <p className="text-foreground font-semibold">
-              {facebookEnabled ? "Il collegamento Facebook è attivo per questa installazione." : "Il collegamento Facebook deve essere attivato dall'amministratore."}
+              In Profilo → Social trovi lo stato dei servizi attivati dal gestore.
             </p>
             <p className="flex items-start gap-2">
               <ShieldCheck className="w-4 h-4 text-cyan mt-0.5 shrink-0" />
-              La password Facebook viene inserita soltanto sul sito di Meta, mai su ClickSocial.
+              Le password dei social si inseriscono sui loro siti ufficiali, mai su ClickSocial.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3 mt-8">
@@ -113,25 +110,25 @@ export function ConnectionsSection() {
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-facebook">Meta</span>
               <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-facebook/10 text-facebook">
-                {facebookEnabled ? "Disponibile" : "Da configurare"}
+                Pagine
               </span>
             </div>
             <h3 className="font-heading text-lg font-bold mt-2">Pagina Facebook</h3>
             <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-              Un solo collegamento per scegliere la Pagina Facebook che vuoi usare per la
-              pubblicazione programmata dei tuoi post.
+              Scegli una Pagina che gestisci. Con Pro puoi pubblicare una foto subito o
+              programmarla, dopo l’attivazione del servizio da parte del gestore.
             </p>
           </article>
           <article className="rounded-[20px] bg-tiktok/5 border border-tiktok/20 p-6">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider">TikTok</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider">Instagram e TikTok</span>
               <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-foreground/10">
-                Pubblicazione manuale
+                Foto
               </span>
             </div>
-            <h3 className="font-heading text-lg font-bold mt-2">TikTok</h3>
+            <h3 className="font-heading text-lg font-bold mt-2">I tuoi account</h3>
             <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-              Puoi creare i contenuti per TikTok e Instagram e pubblicarli manualmente scaricandoli dalla libreria. Il collegamento diretto non è incluso.
+              Instagram richiede un account professionale. Su TikTok le opzioni dipendono dai permessi concessi. Con Pro e il servizio attivo puoi inviare o programmare foto; resta disponibile il download per pubblicarle personalmente.
             </p>
           </article>
           <p className="text-xs text-muted-foreground">

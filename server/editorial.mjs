@@ -6,6 +6,7 @@ export function instant(value) {
   return value;
 }
 export function editablePost(data) {
+  if (data.status === 'da_verificare') fail(409, 'Verifica prima l’esito dell’invio sul social dalla Libreria.');
   if (['in_coda', 'in_pubblicazione'].includes(data.status)) fail(409, 'Annulla prima l’invio automatico. Se è già in corso, attendi il completamento.');
   if (data.status === 'pubblicato') fail(409, 'Il post è già pubblicato e rimane in sola lettura.');
 }
@@ -22,7 +23,7 @@ export function planPost(data, body) {
 export function cancelSchedule(data) {
   if (data.status !== 'in_coda') fail(409, 'Il post non è in coda oppure la pubblicazione è già iniziata. Aggiorna il calendario.');
   data.status = 'pronto';
-  delete data.scheduled_at; delete data.social_page_id; delete data.schedule_error;
+  delete data.scheduled_at; delete data.social_page_id; delete data.schedule_error; delete data.social_job;
   return data;
 }
 

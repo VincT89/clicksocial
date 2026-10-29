@@ -26,7 +26,7 @@ export function restoreStudioDraft(raw, defaults) {
     copy: data.copy ? { headline: text(data.copy.headline, 500), caption: text(data.copy.caption, 20000), hashtags: text(data.copy.hashtags, 5000), graphic_subtitle: text(data.copy.graphic_subtitle, 200), graphic_url: imagePath(data.copy.graphic_url) } : null,
     activePreset: text(data.activePreset, 40) || 'Originale',
     editingId: /^[a-f0-9-]{36}$/.test(data.editingId || '') ? data.editingId : null,
-    postStatus: ['bozza', 'pronto', 'in_coda', 'in_pubblicazione', 'pubblicato'].includes(data.postStatus) ? data.postStatus : 'bozza',
+    postStatus: ['bozza', 'pronto', 'in_coda', 'in_pubblicazione', 'pubblicato', 'da_verificare'].includes(data.postStatus) ? data.postStatus : 'bozza',
   };
 }
 

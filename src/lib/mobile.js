@@ -49,7 +49,7 @@ export async function nativeJson(path, options = {}) {
     url: apiUrl('/api' + path), method: options.method || 'GET', headers: await nativeHeaders(options.headers),
     ...(options.body !== undefined ? { data: JSON.parse(options.body) } : {}),
     responseType: 'json', connectTimeout: 15000, readTimeout: 180000, disableRedirects: true,
-  }).catch(() => { throw new Error('Non riesco a raggiungere ClickSocial. Verifica che il PC sia acceso, che il collegamento mobile sia avviato e che il telefono usi lo stesso Wi-Fi.'); });
+  }).catch(() => { throw new Error(localTest ? 'Non riesco a raggiungere ClickSocial. Verifica che il PC sia acceso, che il collegamento mobile sia avviato e che il telefono usi lo stesso Wi-Fi.' : 'Non riesco a raggiungere il server di ClickSocial. Controlla la connessione Internet e riprova. Se il problema continua, contatta il gestore.'); });
   if (result.status < 200 || result.status >= 300) throw responseError(result.status, result.data);
   return result.data;
 }

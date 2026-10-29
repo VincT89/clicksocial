@@ -21,6 +21,7 @@ export default function Profile() {
   const [upgrading, setUpgrading] = useState(false);
   const [params, setParams] = useSearchParams();
   const settings = appPublicSettings?.public_settings || {};
+  useEffect(() => { const target = params.get('section'); if (sections.some(item => item.id === target)) setSection(target); }, [params]);
   useEffect(() => {
     let active = true;
     Promise.all([api.auth.me(), api.entities.Post.list()]).then(([account, posts]) => {
@@ -64,8 +65,8 @@ export default function Profile() {
       </section>
       <section hidden={section !== 'social'} data-tour="profile-social" className="max-w-4xl rounded-xl border border-border bg-card p-5 sm:p-6">
         <h2 className="font-heading text-xl mb-2">Social collegati</h2>
-        <p className="text-sm text-muted-foreground mb-6">Collega una Pagina Facebook per l’invio programmato. Instagram e TikTok prevedono download e pubblicazione manuale.</p>
-        <SocialConnections />
+        <p className="text-sm text-muted-foreground mb-6">Gestisci gli account della tua attività. Prima di ogni invio scegli e confermi dove pubblicare.</p>
+        <SocialConnections active={section === 'social'} />
         {settings.googleEnabled && <Button variant="outline" onClick={() => api.auth.loginWithProvider('google', '/profilo').catch(e => toast.error(e.message))}>Collega accesso Google</Button>}
       </section>
       <section hidden={section !== 'plan'} data-tour="profile-plan" className="max-w-4xl rounded-xl border border-border bg-card p-5 sm:p-6 space-y-5">
@@ -74,8 +75,8 @@ export default function Profile() {
           <ul className="list-disc pl-5 text-sm text-muted-foreground mt-2 space-y-2"><li>Foto dal dispositivo o dalla fotocamera, ritocco e testi modificabili</li><li>Libreria con calendario e note</li><li>Download di foto e testi</li><li>Due generazioni AI gratuite, quando il servizio è configurato</li></ul>
         </div>
         <div className="border-t border-border pt-5"><h3 className="font-medium">Con Pro</h3>
-          <ul className="list-disc pl-5 text-sm text-muted-foreground mt-2 space-y-2"><li>Generazioni AI senza il limite del piano gratuito</li><li>Invio programmato sulle Pagine Facebook collegate</li></ul>
-          <p className="text-xs text-muted-foreground mt-4">AI e Facebook devono essere configurati anche con Pro. I costi dei fornitori esterni dipendono dai rispettivi account.</p>
+          <ul className="list-disc pl-5 text-sm text-muted-foreground mt-2 space-y-2"><li>Generazioni AI senza il limite del piano gratuito</li><li>Invio delle foto ai social collegati, subito o programmato</li></ul>
+          <p className="text-xs text-muted-foreground mt-4">AI e integrazioni social devono essere attivati dal gestore. La disponibilità della pubblicazione dipende anche dalle autorizzazioni dei social.</p>
         </div>
         {me?.plan !== 'pro' && <><p className="text-sm">Generazioni gratuite utilizzate: {me?.ai_generations_used || 0} di 2.</p>
           <Button onClick={upgrade} disabled={upgrading || !settings.stripeEnabled}>{upgrading ? 'Apertura pagamento…' : settings.stripeEnabled ? 'Passa a Pro' : 'Pagamenti da configurare'}</Button></>}

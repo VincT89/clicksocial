@@ -26,10 +26,11 @@ export function editorialDate(post) {
   return value && dayKey(value) ? value : null;
 }
 export function editorialStage(post) {
+  if (post.status === 'da_verificare') return post.status;
   if (post.status === 'in_coda' || post.status === 'in_pubblicazione' || post.status === 'pubblicato' || post.status === 'fallito') return post.status;
   if (post.planning) return post.image_url ? 'post_creato' : post.planning.stage || 'da_preparare';
   return post.editorial_at ? 'pianificato' : post.status || 'bozza';
 }
-export const STAGES = { da_preparare:'Da preparare', da_fotografare:'Da fotografare', materiale_disponibile:'Materiale disponibile', post_creato:'Post creato', bozza:'Bozza', pronto:'Pronto', pianificato:'Pianificato', in_coda:'Invio automatico in coda', in_pubblicazione:'Invio in corso', pubblicato:'Pubblicato', fallito:'Invio non riuscito' };
+export const STAGES = { da_preparare:'Da preparare', da_fotografare:'Da fotografare', materiale_disponibile:'Materiale disponibile', post_creato:'Post creato', bozza:'Bozza', pronto:'Pronto', pianificato:'Pianificato', in_coda:'Invio automatico in coda', in_pubblicazione:'Invio in corso', pubblicato:'Pubblicato', fallito:'Invio non riuscito', da_verificare:'Esito da verificare sul social' };
 export const PLATFORMS = { instagram:'Instagram', facebook:'Facebook', tiktok:'TikTok' };
 

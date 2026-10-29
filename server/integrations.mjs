@@ -1,6 +1,8 @@
 import { SQL } from './sql.mjs';
 import { randomBytes, createHash } from 'node:crypto';
-import { fail, now, uid, encrypt, decrypt, digest, transaction } from './store.mjs';
+import { fail, now, uid, digest, transaction } from './store.mjs';
+import { createSocialConnections, writeConnection } from './social-connections.mjs';
+import { createSocialPublishing } from './social-publishing.mjs';
 import { ownedImage, saveImage, sniffImage } from './files.mjs';
 import { resolveLogoAnalysis } from '../src/lib/logoPlacement.js';
 import { aiResponseMetadata, pricedAiLog } from './ai-pricing.mjs';
@@ -9,6 +11,8 @@ import { designBrief, imageRequestSize, getTemplate } from '../shared/templates.
 import { editablePost } from './editorial.mjs';
 
 export function createIntegrations(db, config, fetchImpl = fetch) {
+  const social = createSocialConnections(db, config, fetchImpl);
+  const publication = createSocialPublishing(db, config, social);
   async function jsonFetch(url, options = {}, onResponse) {
     const response = await fetchImpl(url, { signal: AbortSignal.timeout(120000), ...options });
     const data = await response.json().catch(() => null);
@@ -35,7 +39,8 @@ export function createIntegrations(db, config, fetchImpl = fetch) {
     }
     if (!config.mailFrom) fail(503, 'Configura MAIL_FROM per inviare email.');
     const nodemailer = (await import('nodemailer')).default;
-    const transport = nodemailer.createTransport({ host: config.smtpHost, port: config.smtpPort, secure: config.smtpSecure,
+    /** Senza TLS immediato imponiamo STARTTLS prima di inviare credenziali e codici di accesso. */
+    const transport = nodemailer.createTransport({ host: config.smtpHost, port: config.smtpPort, secure: config.smtpSecure, requireTLS: !config.smtpSecure,
       auth: config.smtpUser ? { user: config.smtpUser, pass: config.smtpPass } : undefined });
     await transport.sendMail({ from: config.mailFrom, to: recipient, subject, text: body });
   }
@@ -290,44 +295,9 @@ export function createIntegrations(db, config, fetchImpl = fetch) {
   }
   const graph = () => 'https://graph.facebook.com/' + config.metaVersion;
   async function socialStatus(user) {
-    const row = (await db.prepare('SELECT encrypted FROM social_connections WHERE user_id=?').get(user.id));
-    if (!row) return { facebook: { connected: false, pages: [] } };
-    const connection = decrypt(config, row.encrypted);
-    return { facebook: { connected: true, pages: connection.pages.map(p => ({ id: p.id, name: p.name })) } };
+    return social.status(user);
   }
-  let publishing = false;
-  async function publishDuePosts() {
-    if (publishing) return;
-    publishing = true;
-    try {
-      const due = (await db.prepare(`SELECT * FROM posts WHERE ${db.json('status')}='in_coda' AND ${db.json('scheduled_at')}<=? ORDER BY ${db.json('scheduled_at')} LIMIT 100`).all(now()));
-      for (const post of due) {
-        const data = JSON.parse(post.data);
-        const claimed = (await transaction(db, () => db.prepare(`UPDATE posts SET data=json_set(data,'$.status','in_pubblicazione'),updated_at=? WHERE id=? AND ${db.json('status')}='in_coda'`).run(now(), post.id))).changes;
-        if (!claimed) continue;
-        try {
-          const user = (await db.prepare('SELECT * FROM users WHERE id=?').get(post.user_id));
-          if (user?.plan !== 'pro') fail(402, 'Il piano Pro non e attivo.');
-          const connectionRow = (await db.prepare('SELECT encrypted FROM social_connections WHERE user_id=?').get(user.id));
-          if (!connectionRow) fail(400, 'Collegamento Facebook assente.');
-          const page = decrypt(config, connectionRow.encrypted).pages.find(p => p.id === data.social_page_id);
-          if (!page) fail(400, 'Pagina Facebook non disponibile.');
-          const image = (await ownedImage(db, config, user, data.image_url));
-          const form = new FormData();
-          form.set('source', new Blob([image.bytes], { type: image.mime }), image.name);
-          form.set('message', [data.caption, data.hashtags].filter(Boolean).join('\n\n'));
-          form.set('access_token', page.access_token);
-          const output = await jsonFetch(graph() + '/' + encodeURIComponent(page.id) + '/photos', { method: 'POST', body: form });
-          if (!output.post_id) fail(502, 'Facebook non ha restituito il post pubblicato. Verifica la Pagina prima di riprovare.');
-          data.status = 'pubblicato'; data.published_url = 'https://www.facebook.com/' + output.post_id; data.schedule_error = '';
-          data.publication_method = 'facebook'; data.published_at = now(); data.editorial_at ||= data.scheduled_at;
-        } catch (error) {
-          data.status = 'fallito'; data.schedule_error = String(error.message).slice(0,500);
-        }
-        (await db.prepare('UPDATE posts SET data=?,updated_at=? WHERE id=?').run(JSON.stringify(data), now(), post.id));
-      }
-    } finally { publishing = false; }
-  }
+  const publishDuePosts = publication.publishDuePosts;
   async function beginOAuth(provider, user, returnTo = '/') {
     if (provider === 'google' && (!config.googleId || !config.googleSecret)) fail(503, 'Accesso Google non configurato.', 'integration_unconfigured');
     if (provider === 'facebook' && (!config.metaId || !config.metaSecret)) fail(503, 'Collegamento Facebook non configurato.', 'integration_unconfigured');
@@ -374,8 +344,8 @@ export function createIntegrations(db, config, fetchImpl = fetch) {
       after = output.paging.cursors?.after;
       if (!after) break;
     }
-    (await db.prepare(SQL.socialConnection).run(user.id, encrypt(config, { pages, accessToken: extended.access_token })));
+    await writeConnection(db, config, user.id, 'facebook', { pages, accessToken: extended.access_token });
     return { provider, returnTo: '/profilo' };
   }
-  return { sendMail, generateCopy, aiStatus, createCheckout, stripeWebhook, cancelSubscription, socialStatus, publishDuePosts, beginOAuth, finishOAuth };
+  return { sendMail, generateCopy, aiStatus, createCheckout, stripeWebhook, cancelSubscription, socialStatus, publishDuePosts, beginOAuth, finishOAuth, social, publication };
 }

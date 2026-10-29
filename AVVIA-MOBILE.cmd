@@ -3,7 +3,7 @@ setlocal
 cd /d "%~dp0"
 where node >nul 2>nul
 if errorlevel 1 (
-  echo Installa Node.js 24.10 o successivo e riapri questo file.
+  echo Installa Node.js 24.22.1 o una versione 24 successiva aggiornata e riapri questo file.
   pause
   exit /b 1
 )

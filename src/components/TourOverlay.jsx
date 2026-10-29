@@ -58,14 +58,14 @@ export default function TourOverlay() {
     <div ref={tip} tabIndex={-1} role="dialog" aria-modal="false" aria-labelledby="guide-title" aria-describedby="guide-description" className="absolute pointer-events-auto w-80 max-w-[calc(100vw-24px)] max-h-[calc(100dvh-24px)] overflow-y-auto rounded-2xl border border-border bg-card text-card-foreground shadow-xl p-5 focus:outline-none" style={position}>
       <div className="flex items-start justify-between gap-3">
         <h2 id="guide-title" className="font-heading text-lg font-bold">{step.title}</h2>
-        <button type="button" onClick={skip} aria-label="Chiudi guida" className="-mt-2 -mr-2 h-10 w-10 shrink-0 flex items-center justify-center rounded-lg hover:bg-secondary"><X size={18} /></button>
+        <button type="button" onClick={skip} aria-label="Chiudi guida" className="-mt-2 -mr-2 h-11 w-11 shrink-0 flex items-center justify-center rounded-lg hover:bg-secondary"><X size={18} /></button>
       </div>
       <p id="guide-description" className="text-sm text-muted-foreground leading-relaxed mt-2" aria-live="polite">{step.body}</p>
-      <div className="flex items-center justify-between gap-2 mt-5">
+      <div className="flex flex-wrap items-center justify-between gap-2 mt-5">
         <span className="text-xs text-muted-foreground">{stepIndex + 1} di {steps.length}</span>
         <div className="flex gap-2">
-          <Button size="sm" variant="ghost" disabled={!stepIndex} onClick={prev}>Indietro</Button>
-          <Button size="sm" onClick={next}>{stepIndex + 1 === steps.length ? 'Fine' : 'Avanti'}</Button>
+          <Button size="sm" className="min-h-11" variant="ghost" disabled={!stepIndex} onClick={prev}>Indietro</Button>
+          <Button size="sm" className="min-h-11" onClick={next}>{stepIndex + 1 === steps.length ? 'Fine' : 'Avanti'}</Button>
         </div>
       </div>
     </div>

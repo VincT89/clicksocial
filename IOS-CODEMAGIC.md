@@ -52,4 +52,8 @@ Per usare l’app, avvia AVVIA-MOBILE.cmd sul PC e collega l’iPhone alla stess
 
 ## Cosa è stato verificato
 
-Sono disponibili il progetto iOS, lo schema condiviso, i permessi per fotocamera/foto/rete locale e la preparazione del frontend. Il workflow firmato richiede ancora una prima esecuzione su Codemagic con account, certificato e profilo reali. La compilazione Android già riuscita e la sincronizzazione iOS su Windows non dimostrano che Xcode abbia compilato e firmato l’app.
+Durante il collaudo del 12 settembre la build 1.0 (5) è stata compilata, caricata su App Store Connect e aggiunta al gruppo interno TestFlight. Questo risultato riguarda quella build: il codice successivo, i collegamenti social e il nuovo target HTTPS richiedono una nuova compilazione e prove reali. La preparazione Plesk del 28 ottobre aggiorna il Node dei workflow a 24.22.1; non ha avviato una build su Codemagic.
+
+## Usare il backend Plesk
+
+Segui prima [PLESK.md](PLESK.md) e verifica il sito dal telefono. Imposta `MOBILE_API_ORIGIN=https://SOTTODOMINIO_REALE` e `MOBILE_LOCAL_TEST=false` nel gruppo del workflow, sostituendo il segnaposto con l’indirizzo confermato. Le chiavi del backend restano esclusivamente sul server. Ricompila dal commit aggiornato e installa la nuova build TestFlight; quella precedente continua a usare l’indirizzo incorporato in fase di compilazione. Prova accesso, file privati, generazione e ritorno dal consenso social anche fuori dalla rete Wi-Fi del PC.

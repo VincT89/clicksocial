@@ -3,6 +3,7 @@
 .env.*
 *.local
 !.env.example
+!.env.production.example
 
 # Dipendenze e output web
 node_modules
@@ -65,3 +66,62 @@ ios/App/App/Info.runtime.plist
 *.p12
 *.mobileprovision
 *.p8
+*.pfx
+*.pem
+*.key
+*.provisionprofile
+.encryption-key
+
+# Backup, esportazioni e archivi locali
+backup/
+backups/
+exports/
+dumps/
+outputs/
+*.bak
+*.backup
+*.old
+*.orig
+*.dump
+*.sql.gz
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+*.db
+*.db-wal
+*.db-shm
+/dump*.sql
+/backup*.sql
+
+# Risultati dei controlli automatici
+coverage/
+test-results/
+playwright-report/
+
+# Configurazioni e materiali degli assistenti
+AGENTS.md
+AGENTS.*.md
+CLAUDE.md
+CLAUDE.*.md
+GEMINI.md
+GEMINI.*.md
+SKILL.md
+*.prompt.md
+.agents/
+.codex/
+.claude/
+.cursor/
+.windsurf/
+.roo/
+.clinerules
+.clinerules/
+.cursorrules
+.windsurfrules
+.mcp.json
+.github/copilot-instructions.md
+.github/instructions/
+.github/prompts/
+.github/agents/

@@ -36,6 +36,10 @@ codemagic.yaml contiene tre workflow: android-local per l’APK, ios-simulator p
 
 La procedura completa per account, firma e installazione è in [IOS-CODEMAGIC.md](IOS-CODEMAGIC.md). Nel gruppo Codemagic clicksocial_local vanno configurati MOBILE_API_ORIGIN e MOBILE_LOCAL_TEST=true per il collaudo sulla rete locale. L’URL deve essere raggiungibile dal dispositivo durante l’uso dell’app; il servizio di compilazione non ospita il backend.
 
-Il progetto iOS viene sincronizzato anche da Windows. La compilazione con Xcode richiede macOS, disponibile nei workflow Codemagic iOS. Il pacchetto per simulatore non si installa su un iPhone fisico. Il nuovo workflow firmato è predisposto, ma la prima compilazione reale resta da eseguire dopo la configurazione degli account Apple e Codemagic.
+Il progetto iOS viene sincronizzato anche da Windows. La compilazione con Xcode richiede macOS, disponibile nei workflow Codemagic iOS. Il pacchetto per simulatore non si installa su un iPhone fisico. Durante il collaudo del 12 settembre è stata caricata la build 1.0 (5) su TestFlight; le modifiche successive e il passaggio al server pubblico richiedono una nuova build.
 
 Mantieni .env, database, uploads e chiavi di firma fuori da Git. Le eccezioni HTTP sono generate soltanto per il target di collaudo locale; il futuro server pubblico richiederà un target HTTPS.
+
+## Passaggio al sottodominio pubblico
+
+Completa prima caricamento e collaudo web secondo [PLESK.md](PLESK.md). Poi configura `MOBILE_API_ORIGIN` con l’URL HTTPS reale e `MOBILE_LOCAL_TEST=false` nel workflow Codemagic. Controlla che la compilazione legga il commit aggiornato, ricompila e installa la nuova build. Non aggiungere chiavi AI, SMTP o dei social al frontend o alle variabili `VITE_*`. Il PC può rimanere spento quando backend, database e file sono effettivamente sul server e l’app punta a quel server.

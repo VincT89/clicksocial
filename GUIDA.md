@@ -1,6 +1,8 @@
 # ClickSocial — guida all’uso
 
-Aggiornata l’11 settembre 2026. Questa guida descrive le funzioni presenti nella repository APP sul branch main_vincenzo: identità aziendale, cinque template, bozze editoriali, Studio, Libreria e collaudo mobile. ClickSocial è un progetto di [Sodano Consulting](https://sodanoconsulting.it/).
+Aggiornata il 28 ottobre 2026. Questa guida descrive le funzioni presenti nella copia locale APP: identità aziendale, cinque template, bozze editoriali, Studio, Libreria, collegamenti social e collaudo mobile. Le integrazioni social richiedono l’attivazione del gestore e il collaudo con account reali. ClickSocial è un progetto di [Sodano Consulting](https://sodanoconsulting.it/).
+
+Per caricare il sito sul server e trasferire i dati consulta [PLESK.md](PLESK.md). Dopo il trasferimento usa l’indirizzo HTTPS comunicato dal gestore. L’app iPhone deve essere ricompilata per quel server: una build configurata con l’indirizzo del PC continua a richiederne la disponibilità. La programmazione dei post richiede inoltre che il gestore mantenga attivo il servizio o un’attività pianificata, anche quando nessuno visita il sito.
 
 ## Orientarsi nell’app
 
@@ -186,18 +188,34 @@ La ricerca considera titolo, testi, note e brief. I filtri restringono i risulta
 
 - Scaricare foto e testo in un unico ZIP.
 - Copiare caption e hashtag.
-- Configurare o modificare l’invio automatico su Facebook.
+- Modificare un invio automatico ancora in coda.
 - Annullare un invio in coda.
 - Segnare una pubblicazione già effettuata manualmente.
 - Eliminare il contenuto dopo conferma.
 
-**Segna come pubblicato** registra un’azione già eseguita: non pubblica al tuo posto. **Invio automatico Facebook** è una funzione distinta, disponibile con Pro e una Pagina autorizzata. Occorre scegliere la Pagina e confermare la programmazione. Per Instagram e TikTok scarica il contenuto e pubblicalo manualmente dal relativo servizio.
+**Segna come pubblicato** registra un’azione già eseguita: non pubblica al tuo posto. Per inviare una foto usa il pulsante **Pubblica foto** nella scheda del post. Serve Pro, il social attivato dal gestore e un account autorizzato.
+
+La finestra mostra la foto salvata nello Studio. Se l’anteprima non si carica, l’invio resta bloccato: chiudi e riapri la finestra per riprovare. Scegli l’account di destinazione e controlla il testo con gli hashtag: puoi modificarlo per questo invio senza riscrivere il testo originale nello Studio. Il contatore segnala quanto accorciare un testo troppo lungo. Il social resta quello scelto nel post; un invio riguarda un solo social.
+
+Per inviare appena possibile premi **Conferma pubblicazione**. Per scegliere un momento futuro attiva **Programma per una data futura**, controlla l’ora locale indicata e premi **Conferma programmazione**. Confermare aggiorna anche la data editoriale. La Libreria mostra prima l’invio in coda, poi l’elaborazione e infine l’esito. Il server controlla ogni 30 secondi, ma l’elaborazione del social può richiedere più tempo.
+
+Per Instagram sono previsti post foto quadrati, 4:5 o 16:9; il formato 9:16 non viene trasformato automaticamente in un Reel. Se serve, cambia il formato nello Studio e salva. L’app prepara una copia JPEG per l’invio a Instagram o TikTok senza modificare l’immagine originale salvata.
+
+Su TikTok scegli esplicitamente la visibilità tra quelle consentite dal tuo account. I commenti partono disabilitati; puoi abilitarli se l’account lo permette. Puoi impostare un titolo, l’aggiunta della musica e l’etichetta AI. Se promuovi un’attività attiva la dichiarazione commerciale e indica il marchio coinvolto; le collaborazioni con altri marchi non possono avere visibilità Solo io. Prima dell’invio leggi e accetta le condizioni indicate. TikTok può limitare ai test privati un’app aziendale non ancora approvata.
+
+**Esito da verificare sul social** indica che ClickSocial non sa con certezza se l’invio sia riuscito. Non ripete l’invio. Apri il profilo sul social, controlla anche eventuali elaborazioni pendenti, poi usa **Il post è presente** oppure **Il post non è presente** nella Libreria. La seconda scelta sblocca il contenuto ma non lo invia: un nuovo tentativo richiede una nuova conferma. Durante l’invio, o prima di risolvere un esito incerto, il contenuto è protetto da modifiche e cancellazioni.
 
 Il servizio di invio deve essere configurato e attivo sul backend. Il semplice avvio di collaudo **AVVIA-MOBILE.cmd non avvia il servizio periodico di pubblicazione**. Il PC spento non può eseguire gli invii.
 
 ## Account, piano e amministrazione
 
-In **Profilo → Social** trovi il collegamento delle Pagine Facebook e, se configurato, quello dell’accesso Google. Nei primi test mobile esegui i collegamenti dalla versione web sul PC. I servizi mancanti devono essere configurati: l’app non li simula.
+In **Profilo → Social** trovi Facebook, Instagram e TikTok separati. Premi **Collega**, accedi sul sito ufficiale del social, autorizza ClickSocial e torna nell’app. Seleziona l’account o le Pagine corrette e premi **Conferma account selezionati**. Su iPhone usa **Torna a ClickSocial** o chiudi la finestra di autorizzazione per rientrare nel Profilo. Il gestore configura l’app sviluppatore della società; il cliente non deve creare app né inserire chiavi API.
+
+Facebook richiede una Pagina su cui puoi pubblicare. Instagram richiede un account professionale Business o Creator; il percorso Instagram Login usato qui non richiede di collegarlo a una Pagina Facebook. Se appare **Attivazione a cura del gestore**, la configurazione del servizio manca ancora. L’accesso Google, quando configurato, resta un collegamento separato e nel collaudo nativo si usa email e password.
+
+**Verifica collegamenti** controlla le autorizzazioni attuali. **Ricollega** serve dopo scadenza, revoca dei permessi o cambiamento dell’account; annullare il nuovo tentativo conserva il collegamento precedente. Il tentativo scade dopo 15 minuti. **Scollega** rimuove l’accesso salvato in ClickSocial e annulla solo la coda di quel social; gli altri social, le foto e le date editoriali restano. Per revocare anche il consenso dato al fornitore usa le impostazioni del social. Se un invio è in corso o incerto, completane prima la verifica.
+
+Puoi confermare l’account anche nella finestra aperta dal social: tornando alla scheda iniziale di ClickSocial, lo stato si aggiorna automaticamente. Se il browser blocca la finestra, premi **Apri autorizzazione**. Se chiudi la finestra prima di autorizzare, usa **Annulla collegamento** e poi riprova. Un errore durante la conferma rimane visibile mentre controlli le indicazioni; gli aggiornamenti automatici non lo nascondono. Quando il tentativo scade, puoi ripartire con **Collega** o **Ricollega**, controllando prima lo stato degli account mostrato nella stessa pagina.
 
 In **Piano** puoi leggere il piano corrente e usare **Aggiorna stato del piano** dopo una variazione. L’acquisto richiede il servizio di pagamento configurato. La dicitura Pro non garantisce che tutti i servizi esterni siano già attivi.
 
@@ -241,7 +259,7 @@ I modelli AI sono impostazioni del backend. Template e identità aziendale non r
 
 Un APK è per Android e non si installa su iPhone. Il progetto iOS è presente e sincronizzato. Il workflow ios-simulator produce una build per simulatore; il nuovo ios-testflight è predisposto per creare un’app firmata e caricarla su App Store Connect.
 
-Hai confermato l’iscrizione a pagamento Apple Developer attiva e l’account Codemagic. Restano da completare la scheda dell’app, i collegamenti e i file di firma nei servizi, poi la prima compilazione reale. La procedura è descritta in IOS-CODEMAGIC.md nella repository e nella guida iPhone consegnata. La build iOS richiede macOS/Xcode; la sincronizzazione del progetto da Windows non equivale alla compilazione per iPhone.
+La build 1.0 (5) è stata compilata, caricata su TestFlight e resa disponibile al gruppo interno durante il collaudo del 12 settembre. Le modifiche ai collegamenti social richiedono una nuova build; non sono già presenti in quella installata. La procedura di firma è descritta in IOS-CODEMAGIC.md. La build iOS richiede macOS/Xcode; la verifica dei sorgenti da Windows non equivale alla compilazione per iPhone.
 
 La configurazione include i workflow Codemagic Android, iOS simulatore e iPhone/TestFlight. Le ultime modifiche sono state realizzate localmente su main_vincenzo e non sono state pubblicate con un push da questa attività. Per compilare nel cloud occorre che Codemagic utilizzi il codice aggiornato del branch corretto e un target backend esplicito. Il workflow iPhone carica il pacchetto senza inviarlo alla revisione pubblica; il primo accesso per i tester interni si configura in App Store Connect.
 
@@ -257,14 +275,20 @@ Codemagic compila l’app ma non ospita il backend. Con il target Wi-Fi attuale,
 | Il logo o il testo si confonde con la foto | Prova una variante del logo, uno schema più adatto o un ritaglio diverso; controlla i colori aziendali. |
 | Compare un messaggio sul testo troppo lungo | Accorcia titolo o testo di supporto, oppure cambia template. Metti i dettagli nella caption. |
 | Genera non è disponibile | Controlla fotografia, stato del contenuto, generazione già in corso, limite del piano e configurazione AI del backend. |
-| La data non provoca una pubblicazione | È una data editoriale. Per Facebook occorre programmare separatamente l’invio e avere il servizio attivo. |
+| La data non provoca una pubblicazione | È una data editoriale. Usa Pubblica foto, conferma l’invio e verifica che il servizio periodico sia attivo sul server. |
+| Il collegamento richiede HTTPS | Il gestore deve attivare il backend pubblico e i callback social. Il solo indirizzo Wi-Fi del PC non basta. |
+| Non trovo la Pagina Facebook | Verifica di poter pubblicare su quella Pagina e di averla autorizzata nel consenso Meta. Ricollega se necessario. |
+| TikTok rifiuta un invio pubblico | L’app della società potrebbe non aver ancora superato la verifica TikTok; il gestore deve controllare permessi e approvazione. |
+| L’invio ha un esito incerto | Controlla il social e registra l’esito in Libreria. Non ripetere l’invio prima della verifica. |
 | Un altro dispositivo non vede la bozza | Usa lo stesso account e backend e verifica di aver salvato il contenuto nella Libreria. |
 | L’immagine generata copre un soggetto importante | Rivedi l’anteprima, lo schema e le indicazioni. La composizione AI richiede una verifica umana. |
 
 ## Stato delle verifiche e funzioni successive
 
-Sono stati verificati nel browser i cinque template nei quattro formati, le bozze, la generazione con risposte dimostrative, il salvataggio e le schermate responsive. I test automatici di SQLite e MySQL isolati sono passati e la compilazione Android è riuscita. La guida interna viene verificata sulle schermate a cui si riferisce.
+Il 23 settembre sono passati i controlli del codice, la compilazione web, 96 test su SQLite (il test di migrazione MySQL è escluso in questa modalità) e tutti i 97 test su MySQL temporaneo. Le verifiche comprendono anche accesso Google, calendario, isolamento dei clienti, recupero dopo un riavvio, rinnovo dei token e prevenzione dei reinvii.
+
+Nel browser di test isolato sono stati percorsi Profilo, Studio, Libreria e tutte le tappe disponibili delle relative guide, a 320×844, 390×844, 768×900, 1280×900 e 844×390 pixel. Il collaudo ha verificato i tre collegamenti, conferma e annullamento da una seconda finestra, errori persistenti, finestra bloccata, consenso rifiutato, scadenza e nuovo tentativo. Ha verificato anche scelta della Pagina, opzioni TikTok, limiti del testo, anteprima obbligatoria, conversione JPEG e salvataggio dell’invio. Le risposte dei social e gli account erano di collaudo; nessun contenuto è stato pubblicato sui social reali. Le schermate esaminate e i test responsive non sostituiscono la prova su iPhone/Android fisici, in particolare ritorno dall’autorizzazione e tastiera aperta.
 
 Le fotografie AI reali, la fotocamera e il comportamento sui telefoni fisici richiedono il collaudo con i materiali e i dispositivi dell’azienda. I test dimostrativi non certificano il risultato di una generazione reale o una pubblicazione social.
 
-Caroselli con più foto, reel/video, una pre-chiamata separata per testi clienti, ulteriori semplificazioni del collegamento ai social e la distribuzione sul server dedicato restano da sviluppare o definire. Questa guida non li presenta come funzioni già disponibili.
+Caroselli con più foto, reel/video, una pre-chiamata separata per testi clienti e la distribuzione sul server dedicato restano da sviluppare o definire. L’attivazione delle integrazioni della società e il collaudo reale sono descritti in [SOCIAL.md](SOCIAL.md).
