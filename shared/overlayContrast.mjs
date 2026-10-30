@@ -5,8 +5,9 @@ const light = color => linear(color[0]) * .2126 + linear(color[1]) * .7152 + lin
 // Campioni della foto sotto agli elementi, prima di disegnarli. Non analizza semanticamente i soggetti.
 export function overlayScore(pairs, tint = [0, 0, 0], opacity = 0, percentile = 0) {
   if (!pairs.length) return 0;
-  const scores = pairs.map(({ ink, paper, alpha = 1 }) => {
-    const background = paper.map((v, i) => v * (1 - opacity) + tint[i] * opacity);
+  const scores = pairs.map(({ ink, paper, alpha = 1, coverage = 1 }) => {
+    const shade = opacity * coverage;
+    const background = paper.map((v, i) => v * (1 - shade) + tint[i] * shade);
     const a = light(ink.map((v, i) => v * alpha + background[i] * (1 - alpha))), b = light(background);
     return (Math.max(a, b) + .05) / (Math.min(a, b) + .05);
   }).sort((a, b) => a - b);
@@ -30,8 +31,12 @@ export function backdropFor(pairs, target = 4.5, percentile = 0) {
   return best;
 }
 
-export function logoTreatment(pairs) {
+export function logoTreatment(pairs, opacity) {
   const target = 3, percentile = .05;
+  if (Number.isFinite(opacity)) {
+    const best = ['#000000', '#FFFFFF'].map(tint => ({ tint, opacity, score: overlayScore(pairs, rgb(tint), opacity, percentile) })).sort((a, b) => b.score - a.score)[0];
+    return { ...best, sufficient: best.score >= target };
+  }
   const treatment = backdropFor(pairs, target, percentile);
   if (treatment) return { ...treatment, score: overlayScore(pairs, rgb(treatment.tint), treatment.opacity, percentile), sufficient: true };
   // Un marchio multicolore o traslucido può non raggiungere la soglia con nessun fondo.

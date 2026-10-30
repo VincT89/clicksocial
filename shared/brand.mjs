@@ -1,5 +1,5 @@
 export const COLOR_ROLES = ['Primario', 'Secondario', 'Aggiuntivo 1', 'Aggiuntivo 2'];
-export const BUILTIN_FONTS = ['Bricolage Grotesque', 'DM Sans'];
+export const BUILTIN_FONTS = ['Bricolage Grotesque', 'DM Sans', 'Kaushan Script'];
 export const LOGO_VARIANTS = { color: 'A colori', light: 'Chiaro', dark: 'Scuro' };
 export const DEFAULT_COLORS = ['#202020', '#F4F4F4', '#E5E5E5', '#FFFFFF'];
 export const PRIVATE_FILE = /^\/api\/files\/[a-f0-9-]{36}$/;

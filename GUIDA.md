@@ -33,6 +33,8 @@ Controlla sempre l’anteprima. La pulizia rimuove il fondo uniforme collegato a
 
 Nello Studio, apri l’ingranaggio, poi **Grafica → Loghi e colori del post → Variante del logo**. **Automatica in base al contrasto** sceglie fra i file caricati. Puoi anche scegliere una variante precisa. Il logo parte dalla posizione del template; puoi spostarlo e ridimensionarlo mantenendone proporzioni e colori.
 
+Per regolare lo sfondo dietro al marchio, apri **Grafica**, seleziona **Logo** in **Elemento da modificare** e usa **Sfondo del logo**. **Intensità dello sfondo** va da 0% (trasparente) a 100% (coprente); **Dimensione dello sfondo** va da 50% a 250% rispetto al riquadro del logo. Le dimensioni del marchio restano indipendenti. **Ripristina sfondo automatico** ripristina la correzione basata sul contrasto e la dimensione iniziale, conservando la posizione del logo. Le regolazioni vengono salvate nel post e applicate all’immagine esportata.
+
 Il contrasto considera anche la trasparenza del marchio. Se non basta la correzione locale del fondo, compare un avviso sotto l’anteprima: la fotografia e il logo rimangono visibili e puoi continuare a modificare e salvare. Prova un’altra variante, un altro template o regola il ritaglio per migliorare la leggibilità. Un file mancante, illeggibile o completamente vuoto dopo la pulizia deve invece essere corretto prima di esportare.
 
 ### Colori e font
@@ -141,15 +143,23 @@ Puoi partire direttamente da **Nuovo post** quando hai già la foto. **Scegli fo
 
 ### Modalità e richieste AI
 
+In **Testi e AI**, l’opzione **Stile testo automatico** consente all’AI di scegliere font, peso, dimensioni, colori e allineamento di titolo e sottotitolo in base alla foto e al brand. È disattivata inizialmente. Se la attivi, il successivo **Genera** può sostituire anche lo stile personalizzato; disattivala per conservarlo. Le posizioni manuali restano fisse. L’opzione è salvata nel post e nella bozza del dispositivo.
+
+L’AI può differenziare una parola dal resto del titolo, anche con un carattere calligrafico più grande, e scegliere una pennellata dietro al testo. La scelta dipende dalla foto e dal messaggio: non tutti i post richiedono il corsivo o uno sfondo dipinto. In **Grafica → Composizione del testo** puoi modificare **Parola in evidenza**, font, colore, dimensione relativa e riga dedicata. La parola deve comparire nel titolo; se cambi il testo, aggiorna anche quella da evidenziare. In **Sfondo della scritta** scegli contrasto automatico, nessuno o pennellata; per la pennellata puoi regolare colore e intensità. Lo sfondo segue il riquadro e rimane dentro l’area riservata.
+
+Il font calligrafico **Kaushan Script** è incluso nell’app con la sua licenza e funziona anche senza scaricare font da Internet. Titolo, parola in evidenza e pennellata restano modificabili separatamente nello Studio; l’esportazione li unisce nell’immagine finale.
+
+I caratteri possono essere quelli inclusi nell’app o quelli già caricati nel brand del post. L’AI non può aggiungere font da Internet. Original sceglie lo stile insieme ai testi; Enhance e Creative lo scelgono durante l’analisi della fotografia finale. Questa opzione non aggiunge altre richieste al flusso, ma aumenta il contenuto della risposta. Tutti gli elementi restano modificabili prima di salvare.
+
 | Modalità | Cosa fa nei nuovi template | Richieste per una generazione riuscita |
 | --- | --- | --- |
 | Original | Mantiene la fotografia, prepara i testi e cerca spazio libero per le scritte. | Una richiesta per testi e analisi della foto. |
 | Enhance | Prepara i testi, ritocca la fotografia e ne controlla la composizione. | Una richiesta per i testi, una per l’immagine e una per controllarla. |
 | Creative | Prepara i testi e ricompone l’ambientazione lasciando spazio al messaggio. | Una richiesta per i testi, una per l’immagine e una per controllarla. |
 
-Le scritte restano modificabili e vengono posizionate sullo sfondo libero, insieme al logo, cercando di evitare persone, prodotti e dettagli importanti. L’app considera il ritaglio del formato scelto e avvisa quando adatta la composizione. Se hai già spostato un elemento, la sua posizione resta fissa: se interferisce con il soggetto, la generazione lo segnala invece di spostarlo. Puoi ripristinarne la posizione dal pannello Grafica per consentire una nuova disposizione automatica.
+Le scritte restano modificabili e vengono posizionate sullo sfondo libero, insieme al logo, cercando di evitare persone, prodotti e dettagli importanti. L’app considera il ritaglio del formato scelto e avvisa quando adatta la composizione. Se hai già spostato un elemento, la tua posizione resta fissa anche quando copre un soggetto: questa scelta manuale non blocca la generazione. Gli elementi automatici continuano a cercare spazio libero, evitando anche i riquadri scelti manualmente e lo sfondo ampliato del logo. Puoi ripristinare la posizione dal pannello Grafica per consentire una nuova disposizione automatica.
 
-Quando non trova spazio sufficiente, l’app interrompe la generazione: scegli una foto con più respiro o rivedi i riquadri. Il riconoscimento AI può sbagliare: verifica sempre l’anteprima e ricontrollala dopo aver spostato elementi o cambiato ritaglio e formato. I post con i template precedenti mantengono il comportamento originale.
+Quando non trova spazio sufficiente per gli elementi ancora automatici, l’app interrompe la generazione: scegli una foto con più respiro o rivedi i riquadri. Se tutte le posizioni sono manuali, la loro sovrapposizione non viene bloccata dall’analisi AI. Il riconoscimento AI può sbagliare: verifica sempre l’anteprima e ricontrollala dopo aver spostato elementi o cambiato ritaglio e formato. I post con i template precedenti mantengono il comportamento originale.
 
 Scegli il social, il tono e compila **Cosa vuoi comunicare?** con indicazioni reali. Questi dati vengono usati quando premi Genera. Il testo provvisorio della bozza guida la scrittura ma non è una promessa di riproduzione parola per parola: i campi del risultato restano modificabili.
 

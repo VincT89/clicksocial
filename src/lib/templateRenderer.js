@@ -3,7 +3,10 @@ import { removeLogoBackground } from './logoBackground';
 import { drawFilteredImage } from './photoFilters';
 import { contrast, readableColor } from '../../shared/brand.mjs';
 import { getTemplate, FORMATS, fitTextBox, cropSource, normalizeDesign, fitLogoBox, designLayout } from '../../shared/templates.mjs';
-import { logoTreatment, textTreatment, backdropFor, rgb } from '../../shared/overlayContrast.mjs';
+import { logoTreatment, textTreatment, backdropFor, overlayScore, rgb } from '../../shared/overlayContrast.mjs';
+import { logoBackdropBox } from '../../shared/designElements.mjs';
+import { emphasisFont, emphasisParts, fitStyledText } from '../../shared/textTypography.mjs';
+import { brushTextBox, drawTextBrush } from './textBackdrop';
 
 const fonts = new Map(), logos = new Map();
 const photoCache = new WeakMap();
@@ -97,7 +100,7 @@ async function selectLogo(design, background) {
   return { canvas: best.canvas, warning: best.score < 2 ? 'Il logo ha poco contrasto con questo sfondo. Puoi continuare a modificare e salvare il post; prova un’altra variante del logo o un altro template per migliorarne la leggibilità.' : '' };
 }
 
-function photoSamples(ctx, area, mask) {
+function photoSamples(ctx, area, mask, backdrop) {
   const x = Math.floor(area.x), y = Math.floor(area.y), w = Math.max(1, Math.floor(area.width)), h = Math.max(1, Math.floor(area.height));
   const data = ctx.getImageData(x, y, w, h).data, samples = [];
   const size = mask ? 64 : 32;
@@ -110,7 +113,15 @@ function photoSamples(ctx, area, mask) {
     const pixel = (Math.min(h - 1, Math.floor((row + .5) * h / size)) * w + Math.min(w - 1, Math.floor((col + .5) * w / size))) * 4;
     const paper = [...data.slice(pixel, pixel + 3)], m = (row * size + col) * 4;
     if (!mask) samples.push(paper);
-    else if (mask[m + 3] >= coreAlpha) samples.push({ paper, ink: [...mask.slice(m, m + 3)], alpha: mask[m + 3] / 255 });
+    else if (mask[m + 3] >= coreAlpha) {
+      let coverage = 1;
+      if (backdrop) {
+        const px = x + (col + .5) * w / size, py = y + (row + .5) * h / size, b = backdrop.box;
+        const dx = Math.max(b.x - px, px - b.x - b.width, 0), dy = Math.max(b.y - py, py - b.y - b.height, 0);
+        coverage = Math.max(0, 1 - Math.hypot(dx, dy) / backdrop.feather);
+      }
+      samples.push({ paper, ink: [...mask.slice(m, m + 3)], alpha: mask[m + 3] / 255, coverage });
+    }
   }
   return samples;
 }
@@ -145,7 +156,9 @@ async function selectOverlayLogo(design, template, ctx, area) {
     const canvas = await prepareLogo(logo), position = fitLogoBox(canvas.width, canvas.height, area, template.logoAlign, template.logoVertical);
     const sample = document.createElement('canvas'); sample.width = sample.height = 64;
     const sampleCtx = sample.getContext('2d'); sampleCtx.drawImage(canvas, 0, 0, 64, 64);
-    const treatment = logoTreatment(photoSamples(ctx, position, sampleCtx.getImageData(0, 0, 64, 64).data));
+    const size = design.elements?.logo?.backdrop_size || 1;
+    const backdrop = { box: logoBackdropBox(position, size), feather: Math.min(ctx.canvas.width, ctx.canvas.height) * .01 * size };
+    const treatment = logoTreatment(photoSamples(ctx, position, sampleCtx.getImageData(0, 0, 64, 64).data, backdrop), design.elements?.logo?.backdrop_opacity);
     return { variant, canvas, position, treatment };
   }));
   const usable = loaded.filter(item => item.treatment.sufficient);
@@ -175,8 +188,12 @@ export async function renderTemplate(canvas, source, input, filters, headline = 
   const design = normalizeDesign(input), template = getTemplate(design.template_id, design.template_version);
   const { width: w, height: h } = FORMATS[design.format], layout = designLayout(design);
   const elementLayout = {};
+  const logoBackdrop = design.elements?.logo || {};
+  const useOverlayLogo = template.overlay || logoBackdrop.backdrop_opacity !== undefined || logoBackdrop.backdrop_size !== undefined;
   const background = design.brand.colors[template.background];
-  const [headingFamily, bodyFamily, legacyLogo] = await Promise.all([ensureFont(design.brand.fonts.heading), ensureFont(design.brand.fonts.body), template.overlay ? null : selectLogo(design, background)]);
+  const emphasis = design.elements?.heading?.emphasis;
+  const accentFont = emphasis ? emphasisFont(design, emphasis) : null;
+  const [headingFamily, bodyFamily, legacyLogo, accentFamily] = await Promise.all([ensureFont(design.brand.fonts.heading), ensureFont(design.brand.fonts.body), useOverlayLogo ? null : selectLogo(design, background), accentFont ? ensureFont(accentFont) : null]);
   canvas.width = w; canvas.height = h; const ctx = canvas.getContext('2d');
   ctx.fillStyle = background; ctx.fillRect(0, 0, w, h);
   const rect = value => ({ x: value.x * w, y: value.y * h, width: value.width * w, height: value.height * h });
@@ -185,7 +202,10 @@ export async function renderTemplate(canvas, source, input, filters, headline = 
   ctx.drawImage(filtered, photo.x, photo.y, photo.width, photo.height);
   let autoColor = readableColor(design.brand.colors[template.foreground], background);
   if (template.overlay && (headline.trim() || subtitle.trim())) {
-    const areas = [['heading', headline], ['subtitle', subtitle]].filter(([role, text]) => text.trim() && (!design.elements?.[role]?.color || design.elements[role].color === 'auto')).map(([role]) => rect(layout[role]));
+    const areas = [['heading', headline], ['subtitle', subtitle]].filter(([role, text]) => {
+      const item = design.elements?.[role];
+      return text.trim() && !item?.emphasis && (!item?.backdrop || item.backdrop.style === 'auto') && (!item?.color || item.color === 'auto');
+    }).map(([role]) => rect(layout[role]));
     if (areas.length) {
       const treatment = textTreatment(areas.flatMap(area => photoSamples(ctx, area)), design.brand.colors), pad = Math.min(w, h) * .005;
       /** La leggibilità viene corretta solo vicino alle scritte, senza oscurare il soggetto fra due riquadri distanti. */
@@ -195,8 +215,14 @@ export async function renderTemplate(canvas, source, input, filters, headline = 
   }
   const drawText = (text, role, font, family, heading) => {
     const area = layout[role], custom = design.elements?.[role] || {};
-    const color = custom.color && custom.color !== 'auto' ? custom.color : autoColor;
-    const box = rect(area), measure = (line, size) => {
+    const outer = rect(area), backdropMode = custom.backdrop?.style || 'auto';
+    const box = backdropMode === 'brush' ? brushTextBox(outer) : outer;
+    if (text.trim() && backdropMode === 'brush') drawTextBrush(ctx, outer, custom.backdrop);
+    const rich = heading && emphasis && emphasisParts(text, emphasis).some(part => part.emphasis);
+    const explicitColor = custom.color && custom.color !== 'auto';
+    const color = explicitColor ? custom.color : (rich || backdropMode !== 'auto') ? textTreatment(photoSamples(ctx, box), design.brand.colors).color : autoColor;
+    const accentColor = emphasis?.color && emphasis.color !== 'auto' ? emphasis.color : color;
+    const measure = (line, size) => {
       ctx.font = `${font.weight} ${size}px "${family}"`;
       const metrics = ctx.measureText(line);
       return Math.max(0, metrics.actualBoundingBoxLeft) + Math.max(metrics.width, metrics.actualBoundingBoxRight);
@@ -207,16 +233,40 @@ export async function renderTemplate(canvas, source, input, filters, headline = 
     const descent = Math.max(0, metrics.actualBoundingBoxDescent) / 100;
     const lineHeight = Math.max(heading ? 1.12 : 1.2, ascent + descent + .06);
     const base = template.overlay ? Math.min(w, h) : w;
-    const fitted = fitTextBox(text, box, measure, { min: custom.font_size ? 12 : base * (heading ? .042 : .028), max: custom.font_size || base * (heading ? .085 : .035), maxLines: custom.font_size ? 30 : heading ? 5 : 4, lineHeight });
+    const maximum = custom.font_size || base * (heading ? .085 : .035);
+    const fitted = rich ? fitStyledText(text, emphasis, box, (line, size, accented) => {
+      ctx.font = `${accented ? accentFont.weight : font.weight} ${size}px "${accented ? accentFamily : family}"`;
+      const m = ctx.measureText(line), left = Math.max(0, m.actualBoundingBoxLeft);
+      return { width: left + Math.max(m.width, m.actualBoundingBoxRight), left, ascent: Math.max(0, m.actualBoundingBoxAscent), descent: Math.max(0, m.actualBoundingBoxDescent) };
+    }, { min: 12, max: maximum }) : fitTextBox(text, box, measure, { min: custom.font_size ? 12 : base * (heading ? .042 : .028), max: maximum, maxLines: custom.font_size ? 30 : heading ? 5 : 4, lineHeight });
     if (custom.font_size && fitted.size < custom.font_size - 1) options.onWarning?.('Il testo è stato adattato allo spazio disponibile. Ingrandisci il riquadro o accorcia la scritta per usare tutta la dimensione scelta.');
-    if (text.trim() && custom.color && custom.color !== 'auto') {
-      const treatment = backdropFor(photoSamples(ctx, box).map(paper => ({ paper, ink: rgb(color) })));
+    if (text.trim() && (explicitColor || rich || backdropMode !== 'auto')) {
+      const colors = rich ? [color, accentColor] : [color];
+      const pairs = photoSamples(ctx, box).flatMap(paper => colors.map(ink => ({ paper, ink: rgb(ink) })));
+      const treatment = backdropMode === 'auto' ? backdropFor(pairs) : null;
       if (treatment) shadeRegion(ctx, box, treatment, Math.min(w, h) * .01);
-      else options.onWarning?.('Il colore scelto per ' + (heading ? 'il titolo' : 'il testo di supporto') + ' ha poco contrasto. Prova un altro colore o sposta la scritta.');
+      else if (overlayScore(pairs) < 4.5) options.onWarning?.('Il colore scelto per ' + (heading ? 'il titolo' : 'il testo di supporto') + ' ha poco contrasto. Prova un altro colore, aumenta lo sfondo o sposta la scritta.');
+    }
+    if (heading && emphasis?.text && !rich) options.onWarning?.('La parola da evidenziare non è più nel titolo. Aggiornala in Grafica oppure disattiva l’enfasi.');
+    if (rich) {
+      let y = box.y + (backdropMode === 'brush' ? (box.height - fitted.height) / 2 : template.overlay ? box.height - fitted.height : 0);
+      ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+      for (const line of fitted.lines) {
+        const align = custom.align || template.textAlign;
+        let x = box.x + (align === 'right' ? box.width - line.width : align === 'center' ? (box.width - line.width) / 2 : 0);
+        for (const run of line.runs) {
+          ctx.font = `${run.emphasis ? accentFont.weight : font.weight} ${fitted.size * (run.emphasis ? emphasis.scale : 1)}px "${run.emphasis ? accentFamily : family}"`;
+          ctx.fillStyle = run.emphasis ? accentColor : color;
+          ctx.fillText(run.text, x + run.left, y + line.ascent); x += run.width;
+        }
+        y += line.ascent + line.descent + fitted.gap;
+      }
+      elementLayout[role] = { box: area, fontSize: fitted.size, color, align: custom.align || template.textAlign, visible: !!text.trim() };
+      return;
     }
     ctx.fillStyle = color;
     ctx.font = `${font.weight} ${fitted.size}px "${family}"`; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
-    const top = box.y + (template.overlay && heading ? box.height - fitted.lines.length * fitted.lineHeight : 0);
+    const top = box.y + (backdropMode === 'brush' ? (box.height - fitted.lines.length * fitted.lineHeight) / 2 : template.overlay && heading ? box.height - fitted.lines.length * fitted.lineHeight : 0);
     fitted.lines.forEach((line, i) => {
       const metrics = ctx.measureText(line), left = Math.max(0, metrics.actualBoundingBoxLeft);
       const lineWidth = left + Math.max(metrics.width, metrics.actualBoundingBoxRight);
@@ -229,13 +279,16 @@ export async function renderTemplate(canvas, source, input, filters, headline = 
   drawText(headline, 'heading', design.brand.fonts.heading, headingFamily, true);
   drawText(subtitle, 'subtitle', design.brand.fonts.body, bodyFamily, false);
   const logoStyle = Number.isFinite(design.elements?.logo?.x) ? { ...template, logoAlign: 'left', logoVertical: 'top' } : template;
-  const selected = template.overlay ? await selectOverlayLogo(design, logoStyle, ctx, rect(layout.logo)) : null;
+  const selected = useOverlayLogo ? await selectOverlayLogo(design, logoStyle, ctx, rect(layout.logo)) : null;
   const logo = selected?.canvas || legacyLogo?.canvas;
   if (logo) {
     const area = selected?.position || fitLogoBox(logo.width, logo.height, rect(layout.logo));
-    if (selected) shadeRegion(ctx, area, selected.treatment, Math.min(w, h) * .01);
+    if (selected) {
+      const size = logoBackdrop.backdrop_size || 1;
+      shadeRegion(ctx, logoBackdropBox(area, size), selected.treatment, Math.min(w, h) * .01 * size);
+    }
     ctx.drawImage(logo, area.x, area.y, area.width, area.height);
-    elementLayout.logo = { box: { x: area.x / w, y: area.y / h, width: area.width / w, height: area.height / h }, visible: true };
+    elementLayout.logo = { box: { x: area.x / w, y: area.y / h, width: area.width / w, height: area.height / h }, visible: true, backdropOpacity: selected?.treatment.opacity || 0 };
   }
   const warning = selected?.warning || legacyLogo?.warning;
   if (warning) options.onWarning?.(warning);

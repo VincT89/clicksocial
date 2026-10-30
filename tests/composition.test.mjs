@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
-import { activeCompositionRoles, fitComposition, frameComposition } from '../server/composition.mjs';
+import { activeCompositionRoles, composePhoto, fitComposition, frameComposition } from '../server/composition.mjs';
 import { imageGeometry } from '../server/imageGeometry.mjs';
 import { contains, overlaps } from '../shared/compositionGeometry.mjs';
 import { FORMATS, defaultDesign, designBrief, designLayout, normalizeDesign } from '../shared/templates.mjs';
@@ -10,7 +10,7 @@ import { createApp } from '../server/app.mjs';
 import { createIntegrations } from '../server/integrations.mjs';
 import { now, uid } from '../server/store.mjs';
 import { saveImage } from '../server/files.mjs';
-import { changeElement } from '../shared/designElements.mjs';
+import { changeElement, elementFootprint } from '../shared/designElements.mjs';
 
 const full = { x: 0, y: 0, width: 1, height: 1 };
 const emptyScene = { reliable: true, protected_regions: [], quiet_regions: [full] };
@@ -60,18 +60,36 @@ test('composizione: una nuova foto può adattare di nuovo le posizioni automatic
   assert.equal(styled.elements.heading.placement, 'auto');
   const moved = changeElement(first, 'heading', { x: .45 });
   assert.equal(moved.elements.heading.placement, 'manual');
-  assert.throws(() => fitComposition(moved, copy, rightSubject), /posizione personalizzata/);
+  const manual = fitComposition(moved, copy, rightSubject);
+  assert.deepEqual(manual.design.elements.heading, moved.elements.heading);
+  assert.ok(!overlaps(designLayout(manual.design).subtitle, rightSubject.protected_regions[0], .018));
 });
 
-test('composizione: posizioni manuali conservate e conflitti segnalati senza spostamenti silenziosi', () => {
+test('composizione: posizioni manuali conservate anche sopra soggetti o altri elementi manuali', () => {
   const design = defaultDesign();
   design.elements = { heading: { x: .1, y: .1, width: .6, height: .2, color: '#AA2233' }, subtitle: { x: .1, y: .35, width: .6, height: .12 } };
   assert.deepEqual(fitComposition(design, copy, emptyScene), { design, adjusted: false });
   const before = structuredClone(design);
-  assert.throws(() => fitComposition(design, copy, { ...emptyScene, protected_regions: [{ x: .2, y: .15, width: .2, height: .2 }] }), /posizione personalizzata di titolo/);
+  assert.deepEqual(fitComposition(design, copy, { ...emptyScene, protected_regions: [{ x: .2, y: .15, width: .2, height: .2 }] }), { design, adjusted: false });
   assert.deepEqual(design, before);
+  const overlapping = changeElement(design, 'subtitle', { ...design.elements.heading });
+  assert.deepEqual(fitComposition(overlapping, copy, { protected_regions: [full], quiet_regions: [] }), { design: overlapping, adjusted: false });
+  assert.deepEqual(composePhoto(overlapping, copy, { ...emptyScene, reliable: false }, png), { design: overlapping, adjusted: false });
+  assert.throws(() => composePhoto(overlapping, copy, emptyScene, Buffer.alloc(0)), error => error.status === 502);
   assert.throws(() => fitComposition(defaultDesign(), copy, { protected_regions: [full], quiet_regions: [full] }), /spazio libero sufficiente/);
   assert.throws(() => fitComposition(defaultDesign(), copy, { protected_regions: [], quiet_regions: [] }), /spazio libero sufficiente/);
+});
+
+test('composizione: lo sfondo ampliato del logo automatico mantiene libero il soggetto', () => {
+  const design = defaultDesign();
+  design.brand.logos.color.url = '/api/files/' + uid();
+  design.elements = { logo: { backdrop_opacity: .7, backdrop_size: 2.5 } };
+  const subject = { x: .75, y: .70, width: .23, height: .28 };
+  const result = fitComposition(design, { headline: '', graphic_subtitle: '' }, { protected_regions: [subject], quiet_regions: [full] });
+  assert.equal(result.adjusted, true);
+  assert.ok(!overlaps(elementFootprint(result.design, 'logo', designLayout(result.design).logo), subject, .018));
+  assert.equal(result.design.elements.logo.backdrop_size, 2.5);
+  assert.equal(result.design.elements.logo.backdrop_opacity, .7);
 });
 
 test('composizione: ritaglio e spostamento della foto proiettano le aree nel fotogramma finale', () => {
@@ -150,4 +168,15 @@ test('generazione: analisi finale, costi, quota e file privati restano coerenti 
   assert.equal(original.graphic_url, undefined); assert.equal(original.composition_adjusted, true);
   assert.ok(calls[0].payload.text.format.schema.required.includes('composition'));
   assert.deepEqual(readdirSync(join(app.config.dataDir, 'uploads')), files);
+  await app.db.prepare("UPDATE users SET plan='pro' WHERE id=?").run(user.id);
+  const manualDesign = defaultDesign();
+  manualDesign.elements = { heading: { ...full, placement: 'manual' }, subtitle: { x: .1, y: .2, width: .5, height: .2, placement: 'manual' } };
+  scene = { reliable: false, protected_regions: [full], quiet_regions: [] };
+  for (const mode of ['original', 'enhance', 'creative']) {
+    calls = [];
+    const manual = await ai.generateCopy(user, { ...body, design: manualDesign, mode });
+    assert.deepEqual(manual.design, manualDesign);
+    assert.equal(manual.composition_adjusted, false);
+    assert.equal(calls.length, mode === 'original' ? 1 : 3);
+  }
 });

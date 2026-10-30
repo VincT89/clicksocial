@@ -16,7 +16,7 @@ const tones = [
   { value: 'amichevole', label: 'Amichevole' }, { value: 'professionale', label: 'Professionale' },
   { value: 'divertente', label: 'Divertente' }, { value: 'elegante', label: 'Elegante' },
 ];
-export default function CopyPanel({ platform, setPlatform, tone, setTone, mode, setMode, context, setContext, onGenerate, generating, copy, setCopy, aiAvailable, canGenerate = true, templateMode = false, fromPlanning = false }) {
+export default function CopyPanel({ platform, setPlatform, tone, setTone, mode, setMode, context, setContext, onGenerate, generating, copy, setCopy, aiAvailable, canGenerate = true, templateMode = false, fromPlanning = false, autoTextStyle = false, onAutoTextStyleChange }) {
   const [copied, setCopied] = useState(false);
   const timer = useRef(null);
   useEffect(() => () => clearTimeout(timer.current), []);
@@ -36,6 +36,7 @@ export default function CopyPanel({ platform, setPlatform, tone, setTone, mode, 
       </button>)}</div>
     </fieldset>
     {templateMode && <p className="text-xs text-muted-foreground">L’AI cerca spazio per scritte e logo senza coprire il soggetto. Le posizioni spostate da te restano fisse. Enhance e Creative includono un controllo AI aggiuntivo della foto prodotta. Controlla sempre l’anteprima prima di salvare.</p>}
+    {templateMode && <div className="space-y-1"><label className="flex items-center gap-3 min-h-11 text-sm font-medium"><input type="checkbox" checked={autoTextStyle} disabled={generating} onChange={event => onAutoTextStyleChange?.(event.target.checked)} aria-describedby="auto-text-style-help" />Stile testo automatico</label><p id="auto-text-style-help" className="text-xs text-muted-foreground">Quando premi Genera, l’AI adatta font, peso, dimensioni, colori e allineamento alla foto. Disattiva questa opzione per conservare lo stile scelto da te. Le posizioni manuali restano fisse.</p></div>}
     <fieldset data-tour="studio-platform" disabled={generating}>
       <legend className="text-sm font-medium mb-2">Piattaforma</legend>
       <div className="grid grid-cols-3 gap-2">{['Instagram','Facebook','TikTok'].map(p => <button key={p} type="button" aria-pressed={String(platform).toLowerCase() === p.toLowerCase()} onClick={() => setPlatform(p)}

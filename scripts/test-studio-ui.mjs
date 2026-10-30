@@ -17,13 +17,14 @@ let app, browser, page;
 const errors = [], external = [];
 let fixtureImage, compositionScene = { reliable: true, protected_regions: [], quiet_regions: [{ x: 0, y: 0, width: 1, height: 1 }] };
 const aiCalls = [];
+const aiTextStyle = { heading: { font: 'DM Sans', weight: 800, font_size: 72, color: '#244A36', align: 'left', emphasis: { text: 'foto', font: 'Kaushan Script', weight: 400, scale: 1.6, color: '#254B30', separate_line: true }, backdrop: { style: 'brush', color: '#FFF2DC', opacity: .9 } }, subtitle: { font: 'Bricolage Grotesque', weight: 400, font_size: 32, color: '#234034', align: 'left', backdrop: { style: 'auto', color: '#FFFFFF', opacity: 0 } } };
 try {
   app = await createApp({ dataDir: join(directory, 'data'), dbDriver: 'sqlite', origin, localMode: false, port: 0, scheduler: false,
     smtpHost: '', openaiKey: 'fixture-only', textModel: 'gpt-5.6-luna', imageModel: 'gpt-image-2', stripeKey: '', googleId: '', metaId: '', instagramId: '', tiktokKey: '', fetchImpl: async (url, options) => {
       if (url === 'https://api.openai.com/v1/images/edits') { aiCalls.push('image'); return Response.json({ data: [{ b64_json: fixtureImage }] }); }
       assert.equal(url, 'https://api.openai.com/v1/responses', 'Servizi esterni vietati nel collaudo');
       const request = JSON.parse(options.body), inspection = request.text.format.name === 'photo_composition'; aiCalls.push(inspection ? 'composition' : 'copy');
-      const result = { ...(inspection ? {} : { headline: 'Spazio alla foto', graphic_subtitle: 'Dettagli da raccontare', caption: 'Testo di collaudo', hashtags: '#test' }), ...(inspection || request.text.format.schema.properties.composition ? { composition: compositionScene } : {}) };
+      const result = { ...(inspection ? {} : { headline: 'Spazio alla foto', graphic_subtitle: 'Dettagli da raccontare', caption: 'Testo di collaudo', hashtags: '#test' }), ...(inspection || request.text.format.schema.properties.composition ? { composition: compositionScene } : {}), ...(request.text.format.schema.properties.text_style ? { text_style: aiTextStyle } : {}) };
       return Response.json({ status: 'completed', output: [{ content: [{ type: 'output_text', text: JSON.stringify(result) }] }] });
     } });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
@@ -88,6 +89,35 @@ try {
   await page.getByLabel('Testo di supporto', { exact: true }).fill('Un testo personalizzato');
   await page.getByLabel('Font della scritta', { exact: true }).selectOption('Bricolage Grotesque');
   await page.getByLabel('Colore della scritta', { exact: true }).fill('#102C64'); await page.keyboard.press('Tab');
+  await page.getByLabel('Elemento da modificare').selectOption('logo');
+  const backdropOpacity = () => page.getByRole('slider', { name: /^Intensità dello sfondo:/ });
+  const backdropSize = () => page.getByRole('slider', { name: /^Dimensione dello sfondo:/ });
+  await backdropOpacity().press('Home'); await backdropSize().press('End');
+  await close();
+  await page.locator('.studio-editor[aria-busy="false"]').waitFor();
+  const logoBeforeBackdrop = await boxOf('logo'), backdropFrame = await page.locator('.studio-preview-frame').boundingBox();
+  const backdropPoint = { x: (logoBeforeBackdrop.x - logoBeforeBackdrop.width * .25 - backdropFrame.x) / backdropFrame.width, y: (logoBeforeBackdrop.y + logoBeforeBackdrop.height / 2 - backdropFrame.y) / backdropFrame.height };
+  const readBackdropPixel = () => page.locator('.studio-preview-frame canvas').evaluate((canvas, point) => Array.from(canvas.getContext('2d').getImageData(Math.round(point.x * canvas.width), Math.round(point.y * canvas.height), 1, 1).data), backdropPoint);
+  const transparentPixel = await readBackdropPixel();
+  await open('Grafica'); await backdropOpacity().press('End'); await close();
+  await page.locator('.studio-editor[aria-busy="false"]').waitFor();
+  assert.notDeepEqual(await readBackdropPixel(), transparentPixel, 'L’intensità massima disegna lo sfondo anche quando quello automatico non serviva');
+  assert.deepEqual(await boxOf('logo'), logoBeforeBackdrop, 'Lo sfondo non ridimensiona il marchio');
+  await open('Grafica'); await backdropSize().press('Home'); await close();
+  await page.locator('.studio-editor[aria-busy="false"]').waitFor();
+  assert.deepEqual(await readBackdropPixel(), transparentPixel, 'Ridurre lo sfondo libera la fotografia fuori dal logo');
+  await open('Grafica'); await page.getByRole('button', { name: 'Ripristina sfondo automatico', exact: true }).click();
+  assert.equal(await backdropSize().inputValue(), '100');
+  assert.match(await page.locator('label[for="logo-backdrop-opacity"]').innerText(), /automatica/);
+  await settle(); await page.locator('.studio-editor[aria-busy="false"]').waitFor();
+  const setRange = async (slider, value) => {
+    const min = Number(await slider.getAttribute('min')), step = Number(await slider.getAttribute('step')), id = await slider.getAttribute('id');
+    await slider.press('Home'); await settle();
+    for (let next = min + step; next <= value; next += step) { await slider.press('ArrowRight'); await settle(); }
+    await page.waitForFunction(({ id, value }) => Number(document.getElementById(id)?.value) === value, { id, value });
+  };
+  await setRange(backdropOpacity(), 70); await setRange(backdropSize(), 160);
+  assert.equal(await backdropOpacity().inputValue(), '70'); assert.equal(await backdropSize().inputValue(), '160');
   await close();
   await open('Foto'); await page.getByRole('button', { name: 'Vivace', exact: true }).click(); await close();
   await open('Testi e AI'); await page.getByLabel('Caption', { exact: true }).fill('Caption modificata nel pannello'); await close();
@@ -105,7 +135,7 @@ try {
     await open('Grafica');
     const dialog = await page.getByRole('dialog').boundingBox(); assert.ok(dialog.width <= viewport.width && dialog.y >= 0 && dialog.y + dialog.height <= viewport.height + 1, 'Drawer nella schermata');
     assert.ok(await page.getByRole('button', { name: 'Chiudi impostazioni' }).isVisible());
-    if (viewport.width === 390) await page.screenshot({ path: join(directory, 'studio-mobile-drawer.png') });
+    if (viewport.width === 390) { await backdropOpacity().scrollIntoViewIfNeeded(); await page.screenshot({ path: join(directory, 'studio-mobile-drawer.png') }); }
     await page.keyboard.press('Escape'); await page.getByRole('dialog').waitFor({ state: 'hidden' });
     await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Apri impostazioni Studio');
     if (viewport.width === 390) await page.screenshot({ path: join(directory, 'studio-mobile.png') });
@@ -130,6 +160,7 @@ try {
   assert.equal(saved.design.elements.heading.color, '#B42030'); assert.equal(saved.design.elements.heading.align, 'center');
   assert.equal(saved.design.brand.fonts.heading.family, 'DM Sans'); assert.equal(saved.design.brand.fonts.body.family, 'Bricolage Grotesque');
   assert.equal(saved.design.elements.subtitle.color, '#102C64'); assert.ok(saved.design.elements.logo.width > 0);
+  assert.equal(saved.design.elements.logo.backdrop_opacity, .7); assert.equal(saved.design.elements.logo.backdrop_size, 1.6);
   assert.equal(saved.caption, 'Caption modificata nel pannello'); assert.equal(saved.graphic_subtitle, 'Un testo personalizzato');
   assert.deepEqual(readFileSync(join(app.config.dataDir, 'uploads', saved.image_url.split('/').pop())), Buffer.from(preview, 'base64'), 'Esportazione identica all’anteprima, senza maniglie');
   const profile = JSON.parse((await app.db.prepare('SELECT profile FROM users WHERE id=?').get(user.id)).profile);
@@ -138,6 +169,8 @@ try {
   await open('Grafica'); await page.getByLabel('Elemento da modificare').selectOption('heading');
   assert.equal(await page.getByLabel('Font della scritta', { exact: true }).inputValue(), 'DM Sans');
   assert.equal(await page.getByLabel('Colore della scritta', { exact: true }).inputValue(), '#B42030'); await close();
+  await open('Grafica'); await page.getByLabel('Elemento da modificare').selectOption('logo');
+  assert.equal(await backdropOpacity().inputValue(), '70'); assert.equal(await backdropSize().inputValue(), '160'); await close();
   console.log('Salvataggio e riapertura: composizione, font, colori, immagine esportata e isolamento del brand verificati.');
 
   for (const [format, width, height] of [['4:5', 1080, 1350], ['9:16', 1080, 1920], ['16:9', 1920, 1080], ['1:1', 1080, 1080]]) {
@@ -210,6 +243,55 @@ try {
   const generatedPost = (await app.db.prepare('SELECT data FROM posts WHERE user_id=?').all(user.id)).map(row => JSON.parse(row.data)).find(post => post.headline === 'Spazio alla foto');
   assert.deepEqual(generatedPost.design, creative.body.design);
   assert.deepEqual(readFileSync(join(app.config.dataDir, 'uploads', generatedPost.image_url.split('/').pop())), Buffer.from(generatedPreview, 'base64'));
+  await page.goto(origin + '/studio?id=' + postId); await ready(); await open('Grafica');
+  for (const [role, x, y] of [['heading', '12', '20'], ['subtitle', '12', '45'], ['logo', '15', '24']]) {
+    await page.getByLabel('Elemento da modificare').selectOption(role);
+    await page.getByLabel('Orizzontale (%)', { exact: true }).fill(x);
+    await page.getByLabel('Verticale (%)', { exact: true }).fill(y);
+  }
+  await close();
+  const manuallyPlaced = await Promise.all(['titolo', 'testo di supporto', 'logo'].map(boxOf));
+  await open('Testi e AI');
+  const manualGeneration = await generate(); assert.equal(manualGeneration.status, 200); assert.equal(manualGeneration.body.composition_adjusted, false);
+  assert.equal(manualGeneration.body.design.elements.logo.backdrop_opacity, .7); assert.equal(manualGeneration.body.design.elements.logo.backdrop_size, 1.6);
+  for (const [index, role] of ['titolo', 'testo di supporto', 'logo'].entries()) {
+    const actual = await boxOf(role);
+    assert.ok(Math.abs(actual.x - manuallyPlaced[index].x) < 1 && Math.abs(actual.y - manuallyPlaced[index].y) < 1, 'Genera rispetta la posizione manuale di ' + role);
+  }
+  await page.screenshot({ path: join(directory, 'manual-composition.png') });
+  await open('Testi e AI');
+  assert.ok(!await page.getByRole('checkbox', { name: 'Stile testo automatico', exact: true }).isChecked());
+  await page.getByRole('checkbox', { name: 'Stile testo automatico', exact: true }).check();
+  const styled = await generate(); assert.equal(styled.status, 200);
+  assert.equal(styled.body.design.elements.heading.color, '#244A36');
+  assert.equal(styled.body.design.brand.fonts.heading.weight, 800);
+  assert.equal(styled.body.design.elements.heading.x, manualGeneration.body.design.elements.heading.x);
+  await open('Grafica'); await page.getByLabel('Elemento da modificare').selectOption('heading');
+  assert.equal(await page.getByLabel('Font della scritta', { exact: true }).inputValue(), 'DM Sans');
+  assert.equal(await page.getByLabel('Spessore del carattere', { exact: true }).inputValue(), '800');
+  assert.equal(await page.getByLabel('Colore della scritta', { exact: true }).inputValue(), '#244A36');
+  assert.ok(await page.getByRole('checkbox', { name: 'Parola in evidenza', exact: true }).isChecked());
+  assert.equal(await page.getByLabel('Font della parola', { exact: true }).inputValue(), 'Kaushan Script');
+  assert.equal(await page.getByLabel('Sfondo della scritta', { exact: true }).inputValue(), 'brush');
+  await page.getByLabel('Colore della parola', { exact: true }).fill('#193520'); await page.keyboard.press('Tab');
+  await page.getByRole('checkbox', { name: 'Parola su una riga dedicata', exact: true }).uncheck();
+  await page.getByRole('slider', { name: /^Intensità della pennellata:/ }).press('Home'); await settle();
+  await page.getByRole('slider', { name: /^Intensità della pennellata:/ }).press('End'); await settle();
+  await page.getByLabel('Colore della scritta', { exact: true }).fill('#4C2244'); await page.keyboard.press('Tab'); await close();
+  await open('Testi e AI'); await page.getByRole('checkbox', { name: 'Stile testo automatico', exact: true }).uncheck();
+  const kept = await generate(); assert.equal(kept.status, 200); assert.equal(kept.body.design.elements.heading.color, '#4C2244');
+  assert.equal(kept.body.design.elements.heading.emphasis.color, '#193520');
+  assert.equal(kept.body.design.elements.heading.emphasis.separate_line, false);
+  assert.equal(kept.body.design.elements.heading.backdrop.opacity, 1);
+  await open('Testi e AI'); await page.getByRole('checkbox', { name: 'Stile testo automatico', exact: true }).check(); await close();
+  await page.getByRole('button', { name: 'Salva post', exact: true }).click(); await page.waitForURL('**/library');
+  await page.goto(origin + '/studio?id=' + postId); await ready(); await open('Testi e AI');
+  assert.ok(await page.getByRole('checkbox', { name: 'Stile testo automatico', exact: true }).isChecked());
+  await page.setViewportSize({ width: 390, height: 844 }); await page.getByRole('checkbox', { name: 'Stile testo automatico', exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: join(directory, 'text-style-mobile.png') }); await close();
+  await open('Grafica'); await page.getByLabel('Elemento da modificare').selectOption('heading');
+  assert.equal(await page.getByLabel('Colore della parola', { exact: true }).inputValue(), '#193520');
+  await page.getByRole('checkbox', { name: 'Parola in evidenza', exact: true }).uncheck(); await close(); await ready();
   console.log('Generazioni simulate Original e Creative: spazi liberi, conservazione del soggetto, stili, errori e salvataggio verificati.');
   assert.equal(errors.length, 0, errors.join('\n')); assert.equal(external.length, 0, external.join('\n'));
   writeFileSync(join(directory, 'report.json'), JSON.stringify({ passed: true, viewports, errors, external, aiCalls, screenshots: ['studio-desktop.png', 'studio-mobile.png', 'studio-mobile-drawer.png', 'composition-mobile.png', 'composition-desktop.png'] }, null, 2));

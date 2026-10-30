@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { defaultDesign, normalizeDesign, designLayout, designBrief, FORMATS } from '../shared/templates.mjs';
-import { normalizeElements, moveBox, resizeBox, scaleElement } from '../shared/designElements.mjs';
+import { changeElement, elementFootprint, normalizeElements, moveBox, resizeBox, scaleElement } from '../shared/designElements.mjs';
+import { logoTreatment } from '../shared/overlayContrast.mjs';
 import { restoreStudioDraft } from '../src/lib/studioDraft.mjs';
 import { createApp } from '../server/app.mjs';
 import { uid, now, digest } from '../server/store.mjs';
@@ -46,6 +47,29 @@ test('editor: spostamento e ridimensionamento rimangono nella grafica e conserva
   }
 });
 
+test('sfondo logo: limiti, contrasto e ingombro indipendenti dalle dimensioni del marchio', () => {
+  const design = { ...defaultDesign(), elements: { logo: { x: .4, y: .4, width: .2, height: .1, placement: 'auto' } } };
+  const changed = normalizeDesign(changeElement(design, 'logo', { backdrop_opacity: .65, backdrop_size: 2 }));
+  assert.deepEqual(designLayout(changed).logo, designLayout(design).logo);
+  assert.equal(changed.elements.logo.placement, 'auto');
+  const footprint = elementFootprint(changed, 'logo', designLayout(changed).logo);
+  assert.ok(Math.abs(footprint.width - .42) < 1e-9 && Math.abs(footprint.height - .22) < 1e-9 && Math.abs(footprint.x - .29) < 1e-9);
+  assert.ok(designBrief(changed).reserved_areas.find(area => area.role === 'logo').width > .4);
+  const off = changeElement(changed, 'logo', { backdrop_opacity: 0 });
+  assert.deepEqual(elementFootprint(off, 'logo', designLayout(off).logo), designLayout(off).logo);
+  for (const value of [-1, 1.01, NaN, Infinity, '0.5', null]) assert.throws(() => normalizeElements({ logo: { backdrop_opacity: value } }));
+  for (const value of [0, .49, 2.51, NaN, Infinity, '1', null]) assert.throws(() => normalizeElements({ logo: { backdrop_size: value } }));
+  assert.throws(() => normalizeElements({ heading: { backdrop_opacity: .4 } }));
+  for (const size of [.5, 1, 2.5]) assert.doesNotThrow(() => normalizeElements({ logo: { backdrop_size: size } }));
+  const pairs = [{ ink: [255, 255, 255], paper: [255, 255, 255] }];
+  assert.equal(logoTreatment(pairs, 0).opacity, 0);
+  assert.equal(logoTreatment(pairs, 0).sufficient, false);
+  assert.equal(logoTreatment(pairs, .8).opacity, .8);
+  assert.equal(logoTreatment(pairs, .8).tint, '#000000');
+  assert.equal(logoTreatment(pairs, .8).sufficient, true);
+  assert.equal(logoTreatment([{ ...pairs[0], coverage: 0 }], 1).sufficient, false, 'Uno sfondo più piccolo del marchio non garantisce il contrasto sui bordi scoperti');
+});
+
 test('editor: il server conserva le modifiche del post e respinge accessi e asset di altri utenti', async t => {
   mkdirSync(resolve('work/tests'), { recursive: true });
   const aiCalls = [];
@@ -68,7 +92,7 @@ test('editor: il server conserva le modifiche del post e respinge accessi e asse
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6kHcAAAAASUVORK5CYII=', 'base64');
   const photo = await saveImage(app.db, app.config, user, png, 'fixture.png'), foreign = await saveImage(app.db, app.config, other, png, 'foreign.png');
   const design = defaultDesign();
-  design.elements = { heading: { x: .1, y: .1, width: .6, height: .2, font_size: 54, color: '#C02030', align: 'center' }, logo: { x: .2, y: .8, width: .25, height: .08 } };
+  design.elements = { heading: { x: .1, y: .1, width: .6, height: .2, font_size: 54, color: '#C02030', align: 'center' }, logo: { x: .2, y: .8, width: .25, height: .08, backdrop_opacity: .65, backdrop_size: 1.5 } };
   const profileBefore = (await request('/auth/me', undefined, 'GET')).body;
   const saved = await request('/entities/Post', { title: 'Collaudo editor', headline: 'Un titolo', original_image_url: photo.file_url, image_url: photo.file_url, design, status: 'bozza' });
   assert.equal(saved.status, 200);

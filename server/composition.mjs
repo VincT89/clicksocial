@@ -2,7 +2,7 @@ import { FORMATS, TEMPLATES, cropSource, designLayout, getTemplate, normalizeDes
 import { contains, overlaps, roundBox, union, validBox } from '../shared/compositionGeometry.mjs';
 import { imageGeometry } from './imageGeometry.mjs';
 import { fail } from './store.mjs';
-import { isManualElement } from '../shared/designElements.mjs';
+import { elementFootprint, isManualElement } from '../shared/designElements.mjs';
 
 const regionSchema = { type: 'array', maxItems: 16, items: { type: 'object', properties: {
   x: { type: 'number', minimum: 0, maximum: 1 }, y: { type: 'number', minimum: 0, maximum: 1 },
@@ -56,16 +56,19 @@ export function fitComposition(design, copy, regions) {
   const roles = activeCompositionRoles(design, copy), current = designLayout(design);
   const locked = role => isManualElement(design.elements?.[role]);
   const safe = b => regions.quiet_regions.some(area => contains(area, b)) && !regions.protected_regions.some(area => overlaps(area, b, .018));
-  const clear = boxes => boxes.every(safe) && boxes.every((a, i) => boxes.slice(i + 1).every(b => !overlaps(a, b, .012)));
-  if (clear(roles.map(role => current[role]))) return { design, adjusted: false };
-  for (const role of roles) if (locked(role) && !safe(current[role])) fail(502, 'La posizione personalizzata di ' + ({ heading: 'titolo', subtitle: 'testo di supporto', logo: 'logo' }[role]) + ' copre un soggetto o non ha uno sfondo libero. Spostala nello Studio oppure ripristina la posizione prima di generare.');
+  /** Le posizioni manuali sono una scelta dell’utente; la verifica riguarda gli elementi collocati dall’AI. */
+  const clear = (selectedRoles, boxes) => selectedRoles.every((role, i) => {
+    const box = elementFootprint(design, role, boxes[role]);
+    return (locked(role) || safe(box)) && selectedRoles.slice(i + 1).every(other => (locked(role) && locked(other)) || !overlaps(box, elementFootprint(design, other, boxes[other]), .012));
+  });
+  if (clear(roles, current)) return { design, adjusted: false };
   const texts = roles.filter(role => role !== 'logo'), template = getTemplate(design.template_id, design.template_version);
   const seeds = [{ ...template, layouts: { [design.format]: current } }, ...TEMPLATES];
   const candidates = [];
   for (const [index, template] of seeds.entries()) {
     const areas = Object.fromEntries(texts.map(role => [role, locked(role) ? current[role] : template.layouts[design.format][role]]));
     const add = boxes => {
-      if (clear(texts.map(role => boxes[role]))) candidates.push({ boxes, align: template.textAlign, score: index * .02 + texts.reduce((sum, role) => sum + displacement(current[role], boxes[role]), 0) });
+      if (clear(texts, boxes)) candidates.push({ boxes, align: template.textAlign, score: index * .02 + texts.reduce((sum, role) => sum + displacement(current[role], boxes[role]), 0) });
     };
     add(areas);
     const movable = texts.filter(role => !locked(role));
@@ -78,7 +81,7 @@ export function fitComposition(design, copy, regions) {
   let best;
   for (const candidate of candidates) for (const logo of logoBoxes) {
     const boxes = { ...candidate.boxes, ...(logo ? { logo } : {}) };
-    if (!clear(roles.map(role => boxes[role]))) continue;
+    if (!clear(roles, boxes)) continue;
     const score = candidate.score + (logo ? displacement(logo, current.logo) * .5 : 0);
     if (!best || score < best.score) best = { ...candidate, boxes, score };
   }
@@ -93,5 +96,6 @@ export function fitComposition(design, copy, regions) {
 export function composePhoto(design, copy, analysis, bytes) {
   let geometry;
   try { geometry = imageGeometry(bytes); } catch (error) { fail(502, error.message); }
+  if (activeCompositionRoles(design, copy).every(role => isManualElement(design.elements?.[role]))) return { design, adjusted: false };
   return fitComposition(design, copy, frameComposition(analysis, design, geometry));
 }

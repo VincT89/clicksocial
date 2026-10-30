@@ -1,5 +1,5 @@
 import { brandFromProfile, normalizeBrand } from './brand.mjs';
-import { isManualElement, normalizeElements } from './designElements.mjs';
+import { elementFootprint, isManualElement, normalizeElements } from './designElements.mjs';
 import { freeSubjectArea } from './compositionGeometry.mjs';
 
 export const FORMATS = {
@@ -86,9 +86,11 @@ export function normalizeDesign(value, profile = {}) {
   if (!['x', 'y'].every(key => Number.isFinite(crop[key]) && crop[key] >= 0 && crop[key] <= 1)) throw new Error('Ritaglio non valido.');
   const logoVariant = value.logo_variant || 'auto';
   if (!['auto', 'color', 'light', 'dark'].includes(logoVariant)) throw new Error('Variante del logo non valida.');
+  if (value.ai_text_style !== undefined && typeof value.ai_text_style !== 'boolean') throw new Error('Opzione dello stile automatico non valida.');
   return { template_id: template.id, template_version: template.version, format: value.format,
     brand: value.brand ? normalizeBrand(value.brand) : brandFromProfile(profile),
     logo_variant: logoVariant, crop: { x: crop.x, y: crop.y },
+    ...(value.ai_text_style === undefined ? {} : { ai_text_style: value.ai_text_style }),
     ...(value.elements === undefined ? {} : { elements: normalizeElements(value.elements) }) };
 }
 export function designLayout(design) {
@@ -107,7 +109,7 @@ export function designBrief(design, roles = ['heading', 'subtitle', 'logo']) {
   const areas = designLayout(design), { photo, subtitle } = areas;
   const fontBase = t.overlay ? Math.min(f.width, f.height) : f.width;
   const subtitleBudget = Math.floor(subtitle.width * f.width / (fontBase * .032 * .55)) * Math.floor(subtitle.height * f.height / (fontBase * .032 * 1.2));
-  const reserved = roles.map(role => ({ role, ...expandBox(areas[role], .018, .012) }));
+  const reserved = roles.map(role => ({ role, ...expandBox(elementFootprint(design, role, areas[role]), .018, .012) }));
   const customPosition = Object.values(design.elements || {}).some(isManualElement);
   const automaticPosition = Object.values(design.elements || {}).some(element => element.placement === 'auto');
   return { template: t.name, version: t.version, format: design.format, export: `${f.width}x${f.height}`,
