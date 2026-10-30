@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useRef, useEffect } from "react";
-import { DEFAULT_FILTERS } from "@/components/studio/PhotoEditor";
+import { DEFAULT_FILTERS } from "@/lib/photoPresets";
 import { isNative, apiOrigin } from './mobile';
 import { useAuth } from './AuthContext';
 import { Preferences } from '@capacitor/preferences';

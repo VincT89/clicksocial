@@ -1,0 +1,224 @@
+import assert from 'node:assert/strict';
+import { randomBytes, randomUUID } from 'node:crypto';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { resolve, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { createApp } from '../server/app.mjs';
+import { digest, now } from '../server/store.mjs';
+import { saveImage } from '../server/files.mjs';
+import { defaultDesign } from '../shared/templates.mjs';
+
+/** Browser separato e dati fittizi: nessun account, servizio AI o contenuto dell’installazione reale. */
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ? pathToFileURL(resolve(process.env.PLAYWRIGHT_MODULE)).href : 'playwright');
+const directory = resolve('work/tests', 'studio-ui-' + randomUUID());
+mkdirSync(directory, { recursive: true });
+const origin = 'https://clicksocial-editor.example.test';
+let app, browser, page;
+const errors = [], external = [];
+let fixtureImage, compositionScene = { reliable: true, protected_regions: [], quiet_regions: [{ x: 0, y: 0, width: 1, height: 1 }] };
+const aiCalls = [];
+try {
+  app = await createApp({ dataDir: join(directory, 'data'), dbDriver: 'sqlite', origin, localMode: false, port: 0, scheduler: false,
+    smtpHost: '', openaiKey: 'fixture-only', textModel: 'gpt-5.6-luna', imageModel: 'gpt-image-2', stripeKey: '', googleId: '', metaId: '', instagramId: '', tiktokKey: '', fetchImpl: async (url, options) => {
+      if (url === 'https://api.openai.com/v1/images/edits') { aiCalls.push('image'); return Response.json({ data: [{ b64_json: fixtureImage }] }); }
+      assert.equal(url, 'https://api.openai.com/v1/responses', 'Servizi esterni vietati nel collaudo');
+      const request = JSON.parse(options.body), inspection = request.text.format.name === 'photo_composition'; aiCalls.push(inspection ? 'composition' : 'copy');
+      const result = { ...(inspection ? {} : { headline: 'Spazio alla foto', graphic_subtitle: 'Dettagli da raccontare', caption: 'Testo di collaudo', hashtags: '#test' }), ...(inspection || request.text.format.schema.properties.composition ? { composition: compositionScene } : {}) };
+      return Response.json({ status: 'completed', output: [{ content: [{ type: 'output_text', text: JSON.stringify(result) }] }] });
+    } });
+  await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
+  const local = 'http://127.0.0.1:' + app.server.address().port;
+  browser = await chromium.launch({ headless: true, ...(process.env.CLICKSOCIAL_BROWSER_CHANNEL ? { channel: process.env.CLICKSOCIAL_BROWSER_CHANNEL } : {}) });
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1, hasTouch: true });
+  context.setDefaultTimeout(12000);
+  await context.route('**/*', async route => {
+    const request = route.request(), url = new URL(request.url());
+    if (url.origin !== origin) { external.push(url.origin); return route.abort(); }
+    const response = await context.request.fetch(local + url.pathname + url.search, { method: request.method(), headers: await request.allHeaders(), data: request.postDataBuffer() || undefined, maxRedirects: 0 });
+    await route.fulfill({ response });
+  });
+  page = await context.newPage();
+  page.on('pageerror', error => errors.push(error.message));
+  const images = await page.evaluate(() => {
+    const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1080;
+    const ctx = canvas.getContext('2d'); ctx.fillStyle = '#E1DACB'; ctx.fillRect(0, 0, 1080, 1080);
+    ctx.fillStyle = '#7A8879'; ctx.fillRect(650, 200, 320, 580); ctx.fillStyle = '#B5BDA7'; ctx.fillRect(700, 250, 220, 240);
+    const photo = canvas.toDataURL('image/png').split(',')[1];
+    ctx.fillStyle = '#E1DACB'; ctx.fillRect(0, 0, 1080, 1080); ctx.fillStyle = '#7A8879'; ctx.fillRect(110, 200, 320, 580); ctx.fillStyle = '#B5BDA7'; ctx.fillRect(160, 250, 220, 240);
+    const leftPhoto = canvas.toDataURL('image/png').split(',')[1];
+    canvas.width = 360; canvas.height = 120;
+    ctx.fillStyle = '#322868'; ctx.fillRect(0, 0, 360, 120); ctx.fillStyle = '#FFFFFF'; ctx.font = 'bold 62px sans-serif'; ctx.fillText('LOGO', 24, 82);
+    return { photo, leftPhoto, logo: canvas.toDataURL('image/png').split(',')[1] };
+  });
+  const user = { id: randomUUID(), plan: 'pro', role: 'user' }, session = randomBytes(32).toString('hex');
+  await app.db.prepare("INSERT INTO users(id,email,verified,plan,profile,created_at) VALUES (?,?,1,'pro','{}',?)").run(user.id, 'studio-test@example.test', now());
+  await app.db.prepare('INSERT INTO sessions VALUES (?,?,?)').run(digest(app.config, session), user.id, Date.now() + 3600000);
+  await context.addCookies([{ name: 'clicksocial_session', value: session, url: origin, httpOnly: true, secure: true, sameSite: 'Lax' }]);
+  const photo = await saveImage(app.db, app.config, user, Buffer.from(images.photo, 'base64'), 'collaudo.png');
+  const logo = await saveImage(app.db, app.config, user, Buffer.from(images.logo, 'base64'), 'logo-collaudo.png');
+  const design = defaultDesign(); design.brand.logos.color = { url: logo.file_url, background: 'none' };
+  await app.db.prepare('UPDATE users SET profile=? WHERE id=?').run(JSON.stringify({ company_name: 'Attività di collaudo', brand_settings: design.brand }), user.id);
+  const postId = randomUUID(), lockedId = randomUUID(), legacyId = randomUUID();
+  const data = { title: 'Collaudo Studio', headline: 'Una nuova idea', graphic_subtitle: 'Dettagli da raccontare', caption: 'Testo di collaudo', platform: 'instagram', image_url: photo.file_url, original_image_url: photo.file_url, mode: 'original', status: 'bozza', design };
+  for (const [id, post] of [[postId, data], [lockedId, { ...data, status: 'pubblicato' }], [legacyId, { ...data, design: null }]]) await app.db.prepare('INSERT INTO posts VALUES (?,?,?,?,?)').run(id, user.id, JSON.stringify(post), now(), now());
+  const ready = async () => { await page.getByRole('button', { name: 'Sposta titolo', exact: true }).waitFor(); await page.evaluate(() => document.fonts.ready); };
+  const boxOf = role => page.getByRole('button', { name: 'Sposta ' + role, exact: true }).boundingBox();
+  const settle = () => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const open = async tab => { await page.getByRole('button', { name: 'Apri impostazioni Studio' }).click(); await page.getByRole('dialog').waitFor(); if (tab) await page.getByRole('button', { name: tab, exact: true }).click(); };
+  const close = async () => { await page.getByRole('button', { name: 'Chiudi impostazioni', exact: true }).click(); await page.getByRole('dialog').waitFor({ state: 'hidden' }); await settle(); };
+  await page.goto(origin + '/studio?id=' + postId); await ready();
+  assert.equal(await page.getByRole('alert').count(), 0);
+  let before = await boxOf('titolo');
+  await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2); await page.mouse.down(); await page.mouse.move(before.x + before.width / 2 + 40, before.y + before.height / 2 + 20, { steps: 8 }); await page.mouse.up(); await settle();
+  let after = await boxOf('titolo');
+  assert.ok(after.x > before.x + 30 && after.y > before.y + 10, 'Trascinamento titolo');
+  const handle = await page.getByRole('button', { name: 'Ridimensiona titolo' }).boundingBox();
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2); await page.mouse.down(); await page.mouse.move(handle.x + handle.width / 2 + 35, handle.y + handle.height / 2 + 22, { steps: 8 }); await page.mouse.up(); await settle();
+  assert.ok((await boxOf('titolo')).width > after.width + 15, 'Ridimensionamento titolo');
+  await page.getByRole('button', { name: 'Sposta titolo', exact: true }).focus();
+  before = await boxOf('titolo'); await page.keyboard.press('ArrowRight'); await settle(); assert.ok((await boxOf('titolo')).x > before.x, 'Tastiera per spostare');
+  await open('Grafica');
+  await page.getByLabel('Colore della scritta', { exact: true }).focus(); await page.keyboard.press('Tab');
+  assert.ok(await page.getByRole('checkbox', { name: 'Scegli automaticamente un colore leggibile' }).isChecked(), 'Il solo focus non deve disattivare il colore automatico');
+  await page.getByLabel('Font della scritta', { exact: true }).selectOption('DM Sans');
+  await page.getByLabel('Colore della scritta', { exact: true }).fill('#B42030'); await page.keyboard.press('Tab');
+  await page.getByLabel('Allineamento', { exact: true }).selectOption('center');
+  await page.getByLabel('Dimensione del testo (pixel)', { exact: true }).fill('90');
+  await page.getByLabel('Elemento da modificare').selectOption('subtitle');
+  await page.getByLabel('Testo di supporto', { exact: true }).fill('Un testo personalizzato');
+  await page.getByLabel('Font della scritta', { exact: true }).selectOption('Bricolage Grotesque');
+  await page.getByLabel('Colore della scritta', { exact: true }).fill('#102C64'); await page.keyboard.press('Tab');
+  await close();
+  await open('Foto'); await page.getByRole('button', { name: 'Vivace', exact: true }).click(); await close();
+  await open('Testi e AI'); await page.getByLabel('Caption', { exact: true }).fill('Caption modificata nel pannello'); await close();
+  await page.screenshot({ path: join(directory, 'studio-desktop.png') });
+  console.log('Desktop: trascinamento, ridimensionamento, tastiera, font, colori e pannello verificati.');
+
+  const viewports = [{ width: 360, height: 740 }, { width: 390, height: 844 }, { width: 320, height: 568 }, { width: 844, height: 390 }, { width: 768, height: 1024 }];
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport); await settle();
+    const dimensions = await page.evaluate(() => ({ width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth, scrollHeight: document.documentElement.scrollHeight }));
+    assert.ok(dimensions.scrollWidth <= dimensions.width + 1, 'Larghezza della pagina: ' + JSON.stringify(viewport));
+    assert.ok(dimensions.scrollHeight <= dimensions.height + 1, 'Altezza della pagina: ' + JSON.stringify(viewport));
+    const gear = await page.getByRole('button', { name: 'Apri impostazioni Studio' }).boundingBox();
+    assert.ok(gear.x >= 0 && gear.y >= 0 && gear.y + gear.height <= viewport.height, 'Ingranaggio visibile');
+    await open('Grafica');
+    const dialog = await page.getByRole('dialog').boundingBox(); assert.ok(dialog.width <= viewport.width && dialog.y >= 0 && dialog.y + dialog.height <= viewport.height + 1, 'Drawer nella schermata');
+    assert.ok(await page.getByRole('button', { name: 'Chiudi impostazioni' }).isVisible());
+    if (viewport.width === 390) await page.screenshot({ path: join(directory, 'studio-mobile-drawer.png') });
+    await page.keyboard.press('Escape'); await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Apri impostazioni Studio');
+    if (viewport.width === 390) await page.screenshot({ path: join(directory, 'studio-mobile.png') });
+  }
+  await page.setViewportSize({ width: 390, height: 844 }); await settle();
+  const cdp = await context.newCDPSession(page);
+  before = await boxOf('logo');
+  const start = { x: before.x + before.width / 2, y: before.y + before.height / 2 };
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...start, id: 1 }] });
+  for (let i = 1; i <= 8; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: start.x - i * 6, y: start.y - i * 5, id: 1 }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await settle();
+  after = await boxOf('logo'); assert.ok(after.x < before.x - 30 && after.y < before.y - 25, 'Trascinamento touch del logo');
+  await cdp.detach();
+  await page.getByRole('button', { name: 'Sposta logo', exact: true }).focus(); await page.keyboard.press('+'); await settle();
+  assert.ok((await boxOf('logo')).width > after.width, 'Ridimensionamento del logo senza mouse');
+  console.log('Cinque schermi: nessuno scorrimento della pagina; touch, tastiera e chiusura del drawer verificati.');
+
+  await page.locator('.studio-editor[aria-busy="false"]').waitFor();
+  const preview = await page.locator('.studio-preview-frame canvas').evaluate(canvas => canvas.toDataURL('image/png').split(',')[1]);
+  await page.getByRole('button', { name: 'Salva post', exact: true }).click(); await page.waitForURL('**/library');
+  const saved = JSON.parse((await app.db.prepare('SELECT data FROM posts WHERE id=?').get(postId)).data);
+  assert.equal(saved.design.elements.heading.color, '#B42030'); assert.equal(saved.design.elements.heading.align, 'center');
+  assert.equal(saved.design.brand.fonts.heading.family, 'DM Sans'); assert.equal(saved.design.brand.fonts.body.family, 'Bricolage Grotesque');
+  assert.equal(saved.design.elements.subtitle.color, '#102C64'); assert.ok(saved.design.elements.logo.width > 0);
+  assert.equal(saved.caption, 'Caption modificata nel pannello'); assert.equal(saved.graphic_subtitle, 'Un testo personalizzato');
+  assert.deepEqual(readFileSync(join(app.config.dataDir, 'uploads', saved.image_url.split('/').pop())), Buffer.from(preview, 'base64'), 'Esportazione identica all’anteprima, senza maniglie');
+  const profile = JSON.parse((await app.db.prepare('SELECT profile FROM users WHERE id=?').get(user.id)).profile);
+  assert.deepEqual(profile.brand_settings, design.brand, 'Il post non modifica il brand dell’account');
+  await page.goto(origin + '/studio?id=' + postId); await ready();
+  await open('Grafica'); await page.getByLabel('Elemento da modificare').selectOption('heading');
+  assert.equal(await page.getByLabel('Font della scritta', { exact: true }).inputValue(), 'DM Sans');
+  assert.equal(await page.getByLabel('Colore della scritta', { exact: true }).inputValue(), '#B42030'); await close();
+  console.log('Salvataggio e riapertura: composizione, font, colori, immagine esportata e isolamento del brand verificati.');
+
+  for (const [format, width, height] of [['4:5', 1080, 1350], ['9:16', 1080, 1920], ['16:9', 1920, 1080], ['1:1', 1080, 1080]]) {
+    await open('Grafica'); await page.getByText('Formato e schemi iniziali', { exact: true }).click();
+    await page.getByLabel('Formato', { exact: true }).selectOption(format); await close();
+    await page.waitForFunction(({ width, height }) => { const canvas = document.querySelector('.studio-preview-frame canvas'); return canvas?.width === width && canvas?.height === height; }, { width, height });
+    const frame = await page.locator('.studio-preview-frame').boundingBox();
+    assert.ok(Math.abs(frame.width / frame.height - width / height) < .01, 'Proporzioni anteprima ' + format);
+    assert.equal(await page.getByRole('alert').count(), 0, 'Nessun errore nel formato ' + format);
+  }
+  await open('Grafica'); await page.getByLabel('Elemento da modificare').selectOption('heading');
+  await page.getByText('Carica un altro font', { exact: true }).click();
+  await page.getByLabel('Carica font della scritta', { exact: true }).setInputFiles(resolve('public/fonts/DM-Sans.ttf'));
+  await page.waitForFunction(() => document.querySelector('select option[value="custom"]') && !document.querySelector('button[aria-label="Chiudi impostazioni"]').disabled);
+  await close(); await page.locator('.studio-editor[aria-busy="false"]').waitFor();
+  await page.getByRole('button', { name: 'Salva post', exact: true }).click(); await page.waitForURL('**/library');
+  const withFont = JSON.parse((await app.db.prepare('SELECT data FROM posts WHERE id=?').get(postId)).data);
+  assert.match(withFont.design.brand.fonts.heading.url, /^\/api\/files\/[a-f0-9-]{36}$/);
+  assert.equal((await app.db.prepare('SELECT COUNT(*) AS count FROM posts WHERE user_id=?').get(user.id)).count, 3);
+  console.log('Quattro formati e caricamento di un font privato dal drawer verificati.');
+
+  await page.goto(origin + '/studio?id=' + lockedId); await ready();
+  assert.ok(await page.getByRole('button', { name: 'Salva post', exact: true }).isDisabled());
+  assert.ok(await page.getByRole('button', { name: 'Sposta logo', exact: true }).isDisabled());
+  await page.goto(origin + '/studio?id=' + legacyId); await page.getByRole('button', { name: 'Apri impostazioni Studio' }).waitFor();
+  await open('Grafica'); await page.getByRole('button', { name: 'Applica un template alla foto originale' }).click(); await close(); await ready();
+  await page.goto(origin + '/studio?new=1'); await open('Grafica');
+  await page.getByLabel('Titolo grafica', { exact: true }).fill('Preparato prima della foto');
+  await page.getByLabel('Font della scritta', { exact: true }).selectOption('DM Sans');
+  await page.getByLabel('Colore della scritta', { exact: true }).fill('#165A30'); await page.keyboard.press('Tab'); await close();
+  await page.locator('[data-tour="studio-uploader"] input[type="file"]').setInputFiles({ name: 'nuova-foto.png', mimeType: 'image/png', buffer: Buffer.from(images.leftPhoto, 'base64') });
+  await ready(); await open('Grafica');
+  assert.equal(await page.getByLabel('Titolo grafica', { exact: true }).inputValue(), 'Preparato prima della foto');
+  assert.equal(await page.getByLabel('Colore della scritta', { exact: true }).inputValue(), '#165A30');
+  assert.equal(await page.getByLabel('Font della scritta', { exact: true }).inputValue(), 'DM Sans'); await close();
+  assert.equal(aiCalls.length, 0, 'Le modifiche manuali non chiamano l’AI');
+  fixtureImage = images.leftPhoto;
+  compositionScene = { reliable: true, protected_regions: [{ x: .10, y: .18, width: .30, height: .55 }], quiet_regions: [{ x: .43, y: 0, width: .57, height: 1 }] };
+  const generate = async () => {
+    const response = page.waitForResponse(response => response.url().endsWith('/api/functions/generateCopy'));
+    await page.getByRole('button', { name: 'Genera post con AI', exact: true }).click();
+    const result = await response;
+    await page.getByRole('button', { name: 'Salva post', exact: true }).waitFor();
+    await page.waitForFunction(() => !document.querySelector('[data-tour="studio-save"]').disabled);
+    await page.locator('.studio-editor[aria-busy="false"]').waitFor(); await settle();
+    return { status: result.status(), body: await result.json() };
+  };
+  await open('Testi e AI');
+  const original = await generate(); assert.equal(original.status, 200); assert.equal(original.body.composition_adjusted, true);
+  assert.deepEqual(aiCalls, ['copy']);
+  const frame = await page.locator('.studio-preview-frame').boundingBox(), heading = await boxOf('titolo');
+  assert.ok((heading.x - frame.x) / frame.width >= .43, 'L’anteprima sposta il titolo nello spazio libero');
+  assert.equal(original.body.design.elements.heading.color, '#165A30');
+  assert.equal(original.body.design.brand.fonts.heading.family, 'DM Sans');
+  const pixel = await page.locator('.studio-preview-frame canvas').evaluate(canvas => Array.from(canvas.getContext('2d').getImageData(420, 600, 1, 1).data));
+  assert.deepEqual(pixel, [122, 136, 121, 255], 'Il soggetto resta intatto anche vicino al margine delle scritte');
+  await page.screenshot({ path: join(directory, 'composition-mobile.png') });
+  await page.setViewportSize({ width: 1280, height: 900 }); await settle();
+  await page.screenshot({ path: join(directory, 'composition-desktop.png') });
+  await open('Testi e AI'); await page.getByRole('button', { name: /^Creative/ }).click();
+  const creative = await generate(); assert.equal(creative.status, 200); assert.ok(creative.body.graphic_url);
+  assert.deepEqual(aiCalls, ['copy', 'copy', 'image', 'composition']);
+  const generatedPreview = await page.locator('.studio-preview-frame canvas').evaluate(canvas => canvas.toDataURL('image/png').split(',')[1]);
+  compositionScene = { reliable: true, protected_regions: [{ x: 0, y: 0, width: 1, height: 1 }], quiet_regions: [] };
+  await open('Testi e AI'); const rejected = await generate();
+  assert.equal(rejected.status, 502);
+  assert.match(rejected.body.error || rejected.body.message, /spazio libero sufficiente/);
+  assert.equal(await page.locator('.studio-preview-frame canvas').evaluate(canvas => canvas.toDataURL('image/png').split(',')[1]), generatedPreview, 'Il fallimento conserva l’ultima composizione riuscita');
+  await page.getByRole('button', { name: 'Salva post', exact: true }).click(); await page.waitForURL('**/library');
+  const generatedPost = (await app.db.prepare('SELECT data FROM posts WHERE user_id=?').all(user.id)).map(row => JSON.parse(row.data)).find(post => post.headline === 'Spazio alla foto');
+  assert.deepEqual(generatedPost.design, creative.body.design);
+  assert.deepEqual(readFileSync(join(app.config.dataDir, 'uploads', generatedPost.image_url.split('/').pop())), Buffer.from(generatedPreview, 'base64'));
+  console.log('Generazioni simulate Original e Creative: spazi liberi, conservazione del soggetto, stili, errori e salvataggio verificati.');
+  assert.equal(errors.length, 0, errors.join('\n')); assert.equal(external.length, 0, external.join('\n'));
+  writeFileSync(join(directory, 'report.json'), JSON.stringify({ passed: true, viewports, errors, external, aiCalls, screenshots: ['studio-desktop.png', 'studio-mobile.png', 'studio-mobile-drawer.png', 'composition-mobile.png', 'composition-desktop.png'] }, null, 2));
+  console.log('Contenuti bloccati e conversione esplicita dei vecchi post verificati. Report: ' + directory);
+} catch (error) {
+  if (page) await page.screenshot({ path: join(directory, 'failure.png') }).catch(() => {});
+  console.error('Artefatti del collaudo: ' + directory);
+  throw error;
+} finally {
+  if (browser) await browser.close();
+  if (app) await app.close();
+}

@@ -23,6 +23,7 @@
     "db:migrate:mysql": "node scripts/mysql.mjs migrate",
     "test:mysql": "node scripts/test-mysql.mjs",
     "test:social-ui": "node scripts/test-social-ui.mjs",
+    "test:studio-ui": "node scripts/test-studio-ui.mjs",
     "mobile:prepare": "node scripts/mobile-prepare.mjs",
     "mobile:serve": "node scripts/mobile-local.mjs",
     "mobile:android": "node scripts/mobile-android.mjs"

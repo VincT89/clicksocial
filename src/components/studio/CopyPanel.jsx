@@ -32,9 +32,10 @@ export default function CopyPanel({ platform, setPlatform, tone, setTone, mode, 
       <div className="grid grid-cols-3 gap-2">{modes.map(m => <button key={m.value} type="button" aria-pressed={mode === m.value} onClick={() => setMode(m.value)}
         className={['min-w-0 rounded-xl border px-2 py-3 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50', mode === m.value ? 'border-purple bg-accent' : 'border-border hover:bg-secondary'].join(' ')}>
         <span className="block text-sm font-medium">{m.label}</span>
-        <span className="block mt-1 text-xs leading-snug text-muted-foreground">{templateMode && m.value === 'creative' ? 'Nuova ambientazione con AI' : templateMode && m.value === 'original' ? 'Template sulla tua foto' : m.hint}</span>
+        <span className="block mt-1 text-xs leading-snug text-muted-foreground">{templateMode && m.value === 'creative' ? 'Foto composta per il testo' : templateMode && m.value === 'original' ? 'Testo negli spazi liberi' : m.hint}</span>
       </button>)}</div>
     </fieldset>
+    {templateMode && <p className="text-xs text-muted-foreground">L’AI cerca spazio per scritte e logo senza coprire il soggetto. Le posizioni spostate da te restano fisse. Enhance e Creative includono un controllo AI aggiuntivo della foto prodotta. Controlla sempre l’anteprima prima di salvare.</p>}
     <fieldset data-tour="studio-platform" disabled={generating}>
       <legend className="text-sm font-medium mb-2">Piattaforma</legend>
       <div className="grid grid-cols-3 gap-2">{['Instagram','Facebook','TikTok'].map(p => <button key={p} type="button" aria-pressed={String(platform).toLowerCase() === p.toLowerCase()} onClick={() => setPlatform(p)}

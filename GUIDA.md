@@ -1,6 +1,6 @@
 # ClickSocial — guida all’uso
 
-Aggiornata il 28 ottobre 2026. Questa guida descrive le funzioni presenti nella copia locale APP: identità aziendale, cinque template, bozze editoriali, Studio, Libreria, collegamenti social e collaudo mobile. Le integrazioni social richiedono l’attivazione del gestore e il collaudo con account reali. ClickSocial è un progetto di [Sodano Consulting](https://sodanoconsulting.it/).
+Aggiornata il 30 ottobre 2026. Questa guida descrive le funzioni presenti nella copia locale APP: identità aziendale, editor dello Studio, cinque template, bozze editoriali, Libreria, collegamenti social e collaudo mobile. Le integrazioni social richiedono l’attivazione del gestore e il collaudo con account reali. ClickSocial è un progetto di [Sodano Consulting](https://sodanoconsulting.it/).
 
 Per caricare il sito sul server e trasferire i dati consulta [PLESK.md](PLESK.md). Dopo il trasferimento usa l’indirizzo HTTPS comunicato dal gestore. L’app iPhone deve essere ricompilata per quel server: una build configurata con l’indirizzo del PC continua a richiederne la disponibilità. La programmazione dei post richiede inoltre che il gestore mantenga attivo il servizio o un’attività pianificata, anche quando nessuno visita il sito.
 
@@ -31,7 +31,7 @@ Per ogni variante, **Sfondo del file** permette di scegliere:
 
 Controlla sempre l’anteprima. La pulizia rimuove il fondo uniforme collegato ai bordi e conserva i dettagli interni del marchio. Non equivale a uno scontorno professionale di sfondi complessi: in quel caso usa il logo trasparente originale.
 
-Nello Studio, **Variante del logo → Automatica in base al contrasto** sceglie fra i file caricati. Puoi anche scegliere una variante precisa. L’app mantiene le proporzioni del logo e lo ancora nella posizione prevista dal template, senza ricolorarne il disegno.
+Nello Studio, apri l’ingranaggio, poi **Grafica → Loghi e colori del post → Variante del logo**. **Automatica in base al contrasto** sceglie fra i file caricati. Puoi anche scegliere una variante precisa. Il logo parte dalla posizione del template; puoi spostarlo e ridimensionarlo mantenendone proporzioni e colori.
 
 Il contrasto considera anche la trasparenza del marchio. Se non basta la correzione locale del fondo, compare un avviso sotto l’anteprima: la fotografia e il logo rimangono visibili e puoi continuare a modificare e salvare. Prova un’altra variante, un altro template o regola il ritaglio per migliorare la leggibilità. Un file mancante, illeggibile o completamente vuoto dopo la pulizia deve invece essere corretto prima di esportare.
 
@@ -95,7 +95,7 @@ Il salvataggio aggiorna **lo stesso contenuto**, mantenendo brief e data previst
 
 ## Cinque template sulla foto a tutto sfondo
 
-Il template fissa la disposizione degli elementi sovrapposti alla fotografia. Viene salvato e riutilizzato: due generazioni con lo stesso schema mantengono le posizioni di testi e logo, mentre cambiano fotografia e contenuti. Le righe e la dimensione del testo possono adattarsi alla sua lunghezza.
+Il template propone la disposizione iniziale degli elementi sovrapposti alla fotografia. Puoi personalizzarla nello Studio. Posizioni, dimensioni e stili vengono salvati nel post e conservati anche durante la rigenerazione; le righe del testo possono adattarsi allo spazio disponibile.
 
 | Template | Posizione del logo | Zona prevista per il soggetto |
 | --- | --- | --- |
@@ -109,7 +109,7 @@ L’AI riceve le coordinate delle zone riservate a titolo, sottotitolo e logo e 
 
 La disposizione degli elementi è controllata dall’app; il rispetto delle indicazioni nella fotografia generata richiede una verifica visiva. Con una foto già scattata, scegli uno schema compatibile e regola il ritaglio: l’app non sposta automaticamente persone o oggetti all’interno dell’immagine.
 
-I template sono progettati nel codice di ClickSocial. Al momento non è presente un editor per trascinare liberamente logo e testi o costruire nuovi schemi dall’interfaccia.
+Puoi trascinare logo e scritte sull’anteprima e ridimensionarli dalla maniglia nell’angolo. Nel pannello **Grafica** trovi anche posizione, larghezza, dimensione del testo, font, colore e allineamento. Scegliere un altro schema ripristina posizioni e dimensioni; le personalizzazioni sono salvate nel singolo post e non creano un nuovo template condiviso.
 
 ## Formati e inquadratura
 
@@ -126,17 +126,30 @@ Ogni template prevede posizioni e margini per tutti e quattro i formati. Cambiar
 
 ## Lavorare nello Studio
 
+Lo Studio mantiene l’anteprima nella schermata. L’ingranaggio in basso a destra apre un pannello scorrevole con tutte le configurazioni:
+
+- **Grafica**: scegli titolo, testo di supporto o logo; modifica posizione e dimensione. Per le scritte scegli font, spessore, colore e allineamento. Puoi caricare un font personalizzato. Le sezioni espandibili contengono formato, schemi iniziali, loghi e palette del post.
+- **Foto**: regola ritaglio, filtri e ritocco.
+- **Testi e AI**: modifica caption e hashtag, scegli modalità, social e tono, e avvia la generazione.
+- **Post**: imposta nome e stato nella Libreria e consulta il brief della bozza.
+
+Chiudi il pannello per tornare alla foto. Tocca o clicca un elemento per selezionarlo, trascinalo per spostarlo e usa la maniglia per ingrandirlo o ridurlo. Con la tastiera, le frecce spostano l’elemento selezionato; più e meno ne cambiano la dimensione. I controlli numerici nel pannello offrono le stesse regolazioni.
+
+Le modifiche valgono per il post aperto e non cambiano il Profilo o gli altri post. Il colore manuale viene conservato; se poco leggibile compare un avviso. **Scegli automaticamente un colore leggibile** riattiva la scelta automatica. Quando lo spazio non basta, il testo viene adattato e l’anteprima segnala di ingrandire il riquadro o accorciare la scritta. Premi **Salva post** nella barra superiore per conservare il risultato.
+
 Puoi partire direttamente da **Nuovo post** quando hai già la foto. **Scegli foto** carica dal dispositivo; **Scatta foto** apre la fotocamera. Prima del caricamento puoi controllare lo scatto, rifarlo o confermare con **Usa foto**.
 
 ### Modalità e richieste AI
 
 | Modalità | Cosa fa nei nuovi template | Richieste per una generazione riuscita |
 | --- | --- | --- |
-| Original | Mantiene la fotografia e prepara i testi. | Una richiesta per i testi. |
-| Enhance | Prepara i testi e ritocca la fotografia. | Una richiesta per i testi e una per l’immagine. |
-| Creative | Prepara i testi e reinterpreta l’ambientazione della fotografia. | Una richiesta per i testi e una per l’immagine. |
+| Original | Mantiene la fotografia, prepara i testi e cerca spazio libero per le scritte. | Una richiesta per testi e analisi della foto. |
+| Enhance | Prepara i testi, ritocca la fotografia e ne controlla la composizione. | Una richiesta per i testi, una per l’immagine e una per controllarla. |
+| Creative | Prepara i testi e ricompone l’ambientazione lasciando spazio al messaggio. | Una richiesta per i testi, una per l’immagine e una per controllarla. |
 
-La fotografia viene compresa nella stessa richiesta che prepara i testi. Nei nuovi template non serve una richiesta AI separata per scegliere la posizione del logo: lo posiziona l’app.
+Le scritte restano modificabili e vengono posizionate sullo sfondo libero, insieme al logo, cercando di evitare persone, prodotti e dettagli importanti. L’app considera il ritaglio del formato scelto e avvisa quando adatta la composizione. Se hai già spostato un elemento, la sua posizione resta fissa: se interferisce con il soggetto, la generazione lo segnala invece di spostarlo. Puoi ripristinarne la posizione dal pannello Grafica per consentire una nuova disposizione automatica.
+
+Quando non trova spazio sufficiente, l’app interrompe la generazione: scegli una foto con più respiro o rivedi i riquadri. Il riconoscimento AI può sbagliare: verifica sempre l’anteprima e ricontrollala dopo aver spostato elementi o cambiato ritaglio e formato. I post con i template precedenti mantengono il comportamento originale.
 
 Scegli il social, il tono e compila **Cosa vuoi comunicare?** con indicazioni reali. Questi dati vengono usati quando premi Genera. Il testo provvisorio della bozza guida la scrittura ma non è una promessa di riproduzione parola per parola: i campi del risultato restano modificabili.
 

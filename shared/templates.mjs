@@ -1,4 +1,6 @@
 import { brandFromProfile, normalizeBrand } from './brand.mjs';
+import { isManualElement, normalizeElements } from './designElements.mjs';
+import { freeSubjectArea } from './compositionGeometry.mjs';
 
 export const FORMATS = {
   '1:1': { label: 'Quadrato', width: 1080, height: 1080 },
@@ -86,25 +88,34 @@ export function normalizeDesign(value, profile = {}) {
   if (!['auto', 'color', 'light', 'dark'].includes(logoVariant)) throw new Error('Variante del logo non valida.');
   return { template_id: template.id, template_version: template.version, format: value.format,
     brand: value.brand ? normalizeBrand(value.brand) : brandFromProfile(profile),
-    logo_variant: logoVariant, crop: { x: crop.x, y: crop.y } };
+    logo_variant: logoVariant, crop: { x: crop.x, y: crop.y },
+    ...(value.elements === undefined ? {} : { elements: normalizeElements(value.elements) }) };
+}
+export function designLayout(design) {
+  const base = getTemplate(design.template_id, design.template_version).layouts[design.format];
+  return { ...base, ...Object.fromEntries(['heading', 'subtitle', 'logo'].map(role => [role,
+    Number.isFinite(design.elements?.[role]?.x) ? Object.fromEntries(['x', 'y', 'width', 'height'].map(key => [key, design.elements[role][key]])) : base[role]])) };
 }
 export function defaultDesign(profile = {}) {
   profile ||= {};
   const template = getTemplate(profile.preferred_template || 'foto');
   return normalizeDesign({ template_id: template.id, template_version: template.version, format: '1:1' }, profile);
 }
-export function designBrief(design) {
+export function designBrief(design, roles = ['heading', 'subtitle', 'logo']) {
   const t = getTemplate(design.template_id, design.template_version);
   const f = FORMATS[design.format];
-  const areas = t.layouts[design.format], { photo, subtitle } = areas;
+  const areas = designLayout(design), { photo, subtitle } = areas;
   const fontBase = t.overlay ? Math.min(f.width, f.height) : f.width;
   const subtitleBudget = Math.floor(subtitle.width * f.width / (fontBase * .032 * .55)) * Math.floor(subtitle.height * f.height / (fontBase * .032 * 1.2));
+  const reserved = roles.map(role => ({ role, ...expandBox(areas[role], .018, .012) }));
+  const customPosition = Object.values(design.elements || {}).some(isManualElement);
+  const automaticPosition = Object.values(design.elements || {}).some(element => element.placement === 'auto');
   return { template: t.name, version: t.version, format: design.format, export: `${f.width}x${f.height}`,
     photo_area: photo, photo_aspect: +(photo.width * f.width / (photo.height * f.height)).toFixed(3),
-    ...(t.overlay ? { composition: 'Foto a tutto sfondo con testi e logo sovrapposti in posizioni fisse', arrangement: t.description,
+    ...(t.overlay ? { composition: 'Foto a tutto sfondo con testi e logo aggiunti separatamente nelle aree riservate', arrangement: customPosition ? 'Composizione personalizzata dall’utente: rispetta le aree riservate.' : automaticPosition ? 'Composizione adattata alla fotografia: rispetta le aree riservate.' : t.description,
       coordinate_system: 'Coordinate normalizzate 0–1 dell’intero fotogramma, origine in alto a sinistra; x, y, width, height. Non disegnare i riquadri.',
-      reserved_areas: ['heading', 'subtitle', 'logo'].map(role => ({ role, ...expandBox(areas[role], .018, .012) })),
-      subject_area: areas.subject, text_alignment: t.textAlign } : {}),
+      reserved_areas: reserved,
+      subject_area: freeSubjectArea(reserved, areas.subject), text_alignment: design.elements?.heading?.align || t.textAlign } : {}),
     max_headline: t.maxHeadline, max_subtitle: Math.min(t.maxSubtitle, Math.max(20, subtitleBudget)), colors_hex: design.brand.colors,
     color_roles: ['primario', 'secondario', 'aggiuntivo 1', 'aggiuntivo 2'],
     heading_font: design.brand.fonts.heading.family, body_font: design.brand.fonts.body.family };

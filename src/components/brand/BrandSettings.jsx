@@ -8,7 +8,7 @@ import { ensureFont } from '@/lib/templateRenderer';
 import { toast } from 'sonner';
 
 const selectClass = 'min-h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm';
-export default function BrandSettings({ value, onChange, onBusyChange }) {
+export default function BrandSettings({ value, onChange, onBusyChange, showFonts = true }) {
   const id = useId(), [uploading, setUploading] = useState('');
   const changeLogo = (key, patch) => onChange({ ...value, logos: { ...value.logos, [key]: { ...value.logos[key], ...patch } } });
   const changeFont = (key, patch) => onChange({ ...value, fonts: { ...value.fonts, [key]: { ...value.fonts[key], ...patch } } });
@@ -44,7 +44,7 @@ export default function BrandSettings({ value, onChange, onBusyChange }) {
       </div></div>)}</div>
       <p className="text-xs text-muted-foreground">ClickSocial sceglie un colore leggibile dalla palette o, se necessario, bianco o nero. Sulla foto può schiarire o scurire leggermente il fondo sotto testi e logo. I codici della palette vengono conservati.</p>
     </fieldset>
-    <fieldset data-tour="brand-fonts" className="space-y-4"><legend className="font-heading text-lg mb-2">Caratteri aziendali</legend>
+    {showFonts && <fieldset data-tour="brand-fonts" className="space-y-4"><legend className="font-heading text-lg mb-2">Caratteri aziendali</legend>
       <div className="grid sm:grid-cols-2 gap-5">{[['heading', 'Font dei titoli'], ['body', 'Font dei testi']].map(([key, label]) => <div key={key} className="min-w-0 space-y-3">
         <Label htmlFor={id + key}>{label}</Label><select id={id + key} className={selectClass} value={value.fonts[key].url ? 'custom' : value.fonts[key].family} onChange={e => changeFont(key, { family: e.target.value, url: '', weight: key === 'heading' ? 700 : 400 })}>
           {BUILTIN_FONTS.map(name => <option key={name} value={name}>{name}</option>)}{value.fonts[key].url && <option value="custom">{value.fonts[key].family} (caricato)</option>}
@@ -53,6 +53,6 @@ export default function BrandSettings({ value, onChange, onBusyChange }) {
         <input id={id + key + '-file'} type="file" accept=".woff2,.woff,.ttf,.otf" aria-label={key === 'heading' ? 'Carica un font per i titoli' : 'Carica un font per i testi'} className="block w-full min-w-0 text-sm file:mr-2 file:min-h-11 file:rounded-md file:border file:border-input file:bg-background file:px-3 file:text-foreground" disabled={!!uploading} onChange={e => uploadFont(key, e)} />
         <p className="text-xs text-muted-foreground">WOFF2, WOFF, TTF o OTF, massimo 5 MB. Carica la variante del carattere che vuoi utilizzare.</p>
       </div>)}</div>
-    </fieldset>
+    </fieldset>}
   </div>;
 }

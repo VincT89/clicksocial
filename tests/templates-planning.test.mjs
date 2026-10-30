@@ -130,6 +130,7 @@ test('pianificazione e branding: persistenza, proprietà, generazione collegata 
     fetchImpl:async (url, options) => {
       calls.push({ url, body:options.body });
       if (url.endsWith('/images/edits')) return Response.json({ data:[{ b64_json:png.toString('base64') }], usage:{input_tokens:10,output_tokens:20} });
+      if (JSON.parse(options.body).text.format.name === 'photo_composition') return Response.json({ status: 'completed', usage: { input_tokens: 50, output_tokens: 60 }, output: [{ content: [{ type: 'output_text', text: JSON.stringify({ composition: { reliable: true, protected_regions: [], quiet_regions: [{ x: 0, y: 0, width: 1, height: 1 }] } }) }] }] });
       return Response.json({ status:'completed', model:'gpt-5.6-luna', usage:{input_tokens:30,output_tokens:40}, output:[{content:[{type:'output_text',text:JSON.stringify({headline:'Titolo di prova',graphic_subtitle:subtitle,caption:'Testo di collaudo',hashtags:'#test'})}]}] });
     } });
   t.after(() => app.close());
@@ -176,7 +177,7 @@ test('pianificazione e branding: persistenza, proprietà, generazione collegata 
   assert.equal((await request('/functions/generateCopy',{file_url:foreign,draft_id:id},'POST',otherToken)).status,404);
   await request('/auth/me',{brand_settings:{...brand,colors:['#AA0000','#EEEEEE','#777777','#FFFFFF']}},'PATCH');
   const generated = await request('/functions/generateCopy',{file_url:photo,draft_id:id,mode:'creative',platform:'instagram'});
-  assert.equal(generated.status,200); assert.equal(calls.length,2);
+  assert.equal(generated.status,200); assert.equal(calls.length,3);
   assert.deepEqual(generated.data.design.brand,brand,'La bozza mantiene la propria identità salvata');
   assert.equal(generated.data.logo_placement,undefined); assert.equal(generated.data.logo_url,undefined);
   const copyRequest = JSON.parse(calls[0].body), imagePrompt = calls[1].body.get('prompt');
@@ -198,13 +199,13 @@ test('pianificazione e branding: persistenza, proprietà, generazione collegata 
   assert.equal(saved.data.editorial_at,'2026-10-01T08:00:00.000Z'); assert.equal(editorialStage(saved.data),'post_creato');
   assert.equal(saved.data.status,'pronto'); assert.equal(saved.data.scheduled_at,undefined);
   const changedFormat = await request('/entities/Post/'+id,{design:{...saved.data.design,format:'16:9'}},'PATCH');
-  assert.equal(changedFormat.status,200); assert.equal(changedFormat.data.format,'16:9'); assert.equal(calls.length,2);
+  assert.equal(changedFormat.status,200); assert.equal(changedFormat.data.format,'16:9'); assert.equal(calls.length,3);
   const log = JSON.parse((await app.db.prepare('SELECT data FROM ai_logs WHERE user_id=?').get(user.id)).data);
-  assert.equal(log.ai_calls.length,2); assert.equal(log.text_requests,1); assert.equal(log.status,'success');
+  assert.equal(log.ai_calls.length,3); assert.equal(log.text_requests,2); assert.equal(log.status,'success');
   assert.equal((await app.db.prepare('SELECT ai_used FROM users WHERE id=?').get(user.id)).ai_used,1);
   subtitle = 'X'.repeat(designBrief({...saved.data.design,template_id:'foto',format:'1:1'}).max_subtitle + 1);
   const tooLong = await request('/functions/generateCopy',{file_url:photo,mode:'creative',design:{...saved.data.design,template_id:'foto',format:'1:1'}});
   assert.equal(tooLong.status,502);
-  assert.equal(calls.length,3,'Il testo fuori misura deve fermare la richiesta prima di generare la foto a pagamento');
+  assert.equal(calls.length,4,'Il testo fuori misura deve fermare la richiesta prima di generare la foto a pagamento');
   assert.equal((await app.db.prepare('SELECT ai_used FROM users WHERE id=?').get(user.id)).ai_used,1);
 });

@@ -1,0 +1,2 @@
+# Consente l'accesso ai soli file pubblici anche quando la cartella superiore protegge i dati privati.
+Require all granted
