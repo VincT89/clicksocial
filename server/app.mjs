@@ -141,7 +141,7 @@ export async function createApp(options = {}) {
     }
     if (!['instagram','facebook','tiktok'].includes(data.platform)) fail(400,'Piattaforma non valida.');
     if (body.status && !['pronto','bozza'].includes(body.status)) fail(400,'Lo stato di pubblicazione viene gestito dal server.');
-    if (!['original','enhance','creative'].includes(data.mode)) fail(400,'Modalita non valida.');
+    if (!['original','enhance','creative','graphic'].includes(data.mode)) fail(400,'Modalita non valida.');
     if ('editorial_at' in body && !data.planning) fail(400, 'Usa la pianificazione del post per modificarne la data.');
     if (data.planning && !data.design) data.design = await validateDesign(db, config, user, defaultDesign(JSON.parse(user.profile)));
     if (data.planning && body.original_image_url) data.planning = { ...data.planning, stage: 'materiale_disponibile' };

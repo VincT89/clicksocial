@@ -52,7 +52,7 @@ export default function Landing() {
               <div className="inline-flex items-center gap-3 rounded-full bg-card px-4 py-2 pwa-shadow text-xs font-medium">
                 <span className="font-semibold text-purple">Creator workspace</span>
                 <span className="w-1 h-1 rounded-full bg-muted-foreground/40" />
-                <span className="text-muted-foreground">Foto, copy e grafica insieme</span>
+                <span className="text-muted-foreground">Grafica e testi per i tuoi social</span>
               </div>
               <h1 className="font-heading text-4xl sm:text-6xl font-bold tracking-tight leading-[1.02] mt-6">
                 La tua foto.
@@ -60,8 +60,8 @@ export default function Landing() {
                 Il tuo prossimo <em className="italic font-extrabold text-purple">post.</em>
               </h1>
               <p className="text-base sm:text-lg text-muted-foreground mt-5 max-w-md leading-relaxed">
-                Carica uno scatto, dagli il taglio giusto e costruisci un contenuto pronto per il
-                feed. Scaricalo oppure, con Pro, invia e programma le foto su Facebook, Instagram e TikTok collegati e attivati dal gestore.
+                Carica o scatta una foto e premi Genera: grafica, descrizione e hashtag sono pronti da controllare.
+                Salva in bozze oppure pubblica sui social collegati, con il piano Pro. Le impostazioni sono facoltative.
               </p>
               <div className="flex flex-wrap items-center gap-4 mt-8">
                 <Link

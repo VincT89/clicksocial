@@ -7,6 +7,14 @@ export default function ElementOverlay({ design, onChange, layout, selected, onS
     if (disabled || event.button !== 0 || drag.current) return;
     const rect = frame.current.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
+    /** Se le aree tattili si sovrappongono, il centro del logo serve a spostare e il centro della maniglia a ridimensionare. */
+    if (resize) {
+      const box = layout[role].box, grip = event.currentTarget.getBoundingClientRect();
+      const x = (event.clientX - rect.left) / rect.width, y = (event.clientY - rect.top) / rect.height;
+      const toElement = Math.hypot(event.clientX - (rect.left + (box.x + box.width / 2) * rect.width), event.clientY - (rect.top + (box.y + box.height / 2) * rect.height));
+      const toGrip = Math.hypot(event.clientX - (grip.left + grip.width / 2), event.clientY - (grip.top + grip.height / 2));
+      if (x >= box.x && x <= box.x + box.width && y >= box.y && y <= box.y + box.height && toElement < toGrip) resize = false;
+    }
     event.preventDefault(); event.stopPropagation();
     onSelect(role);
     event.currentTarget.focus({ preventScroll: true });

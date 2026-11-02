@@ -47,8 +47,8 @@ async function drawPhoto(canvas, source, filters, headline) {
   }
 }
 
-const PhotoEditor = forwardRef(/** @param {{imageUrl:string,headline?:string,subtitle?:string,design?:any,filters:any,disabled?:boolean,onDesignChange?:Function,selectedElement?:string,onSelectElement?:Function,elementLayout?:any,onLayoutChange?:Function}} props */ function PhotoEditor(
-  { imageUrl, headline, subtitle = '', design = null, filters, disabled = false, onDesignChange, selectedElement, onSelectElement, elementLayout = {}, onLayoutChange },
+const PhotoEditor = forwardRef(/** @param {{imageUrl:string,headline?:string,subtitle?:string,design?:any,filters:any,disabled?:boolean,onDesignChange?:Function,selectedElement?:string,onSelectElement?:Function,elementLayout?:any,onLayoutChange?:Function,onWarningChange?:Function}} props */ function PhotoEditor(
+  { imageUrl, headline, subtitle = '', design = null, filters, disabled = false, onDesignChange, selectedElement, onSelectElement, elementLayout = {}, onLayoutChange, onWarningChange },
   ref
 ) {
   const [exporting, setExporting] = useState(false);
@@ -56,7 +56,6 @@ const PhotoEditor = forwardRef(/** @param {{imageUrl:string,headline?:string,sub
   const canvasRef = useRef(null);
   const [loaded, setLoaded] = useState(null);
   const [imageError, setImageError] = useState("");
-  const [layoutWarning, setLayoutWarning] = useState('');
   const viewportRef = useRef(null);
   const viewport = useSize(viewportRef);
   const source = loaded?.url === imageUrl ? loaded.image : null;
@@ -65,7 +64,7 @@ const PhotoEditor = forwardRef(/** @param {{imageUrl:string,headline?:string,sub
   useEffect(() => {
     let active = true;
     setImageError("");
-    setLayoutWarning('');
+    onWarningChange?.('');
     onLayoutChange?.({});
     const image = new Image();
     image.crossOrigin = "anonymous";
@@ -82,8 +81,8 @@ const PhotoEditor = forwardRef(/** @param {{imageUrl:string,headline?:string,sub
       if (active) image.src = result.url;
       else release();
     }).catch(error => { if (active) setImageError(error.message); });
-    return () => { active = false; image.onload = null; image.onerror = null; release(); };
-  }, [imageUrl]);
+    return () => { active = false; image.onload = null; image.onerror = null; release(); onWarningChange?.(''); };
+  }, [imageUrl, onLayoutChange, onWarningChange]);
 
   useEffect(() => {
     if (!source || !canvasRef.current) return;
@@ -101,13 +100,13 @@ const PhotoEditor = forwardRef(/** @param {{imageUrl:string,headline?:string,sub
         canvasRef.current.getContext('2d').drawImage(rendered, 0, 0);
         onLayoutChange?.(layout);
         setImageError('');
-        setLayoutWarning([...new Set(warnings)].join(' '));
+        onWarningChange?.([...new Set(warnings)].join(' '));
       }
-      catch (error) { if (active) { setImageError(error.message); setLayoutWarning(''); } }
+      catch (error) { if (active) { setImageError(error.message); onWarningChange?.(''); } }
       finally { if (active) setRendering(false); }
     });
     return () => { active = false; cancelAnimationFrame(frame); };
-  }, [source, filters, headline, subtitle, design, onLayoutChange]);
+  }, [source, filters, headline, subtitle, design, onLayoutChange, onWarningChange]);
 
   useImperativeHandle(ref, () => ({
     async exportImage() {
@@ -141,7 +140,6 @@ const PhotoEditor = forwardRef(/** @param {{imageUrl:string,headline?:string,sub
       </div>
     </div>
     {source && imageError && <p role="alert" className="studio-preview-warning">{imageError}</p>}
-    {layoutWarning && <details className="studio-preview-warning"><summary>Controlla la leggibilità</summary><p role="status">{layoutWarning}</p></details>}
     {exporting && <p role="status" className="text-xs text-muted-foreground">Esportazione foto…</p>}
   </div>;
 });

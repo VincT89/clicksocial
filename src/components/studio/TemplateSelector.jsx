@@ -1,7 +1,7 @@
 import { useId } from 'react';
 import { FORMATS, TEMPLATES, getTemplate } from '../../../shared/templates.mjs';
 
-export default function TemplateSelector({ value, onChange, disabled = false }) {
+export default function TemplateSelector({ value, onChange, disabled = false, integrated = false }) {
   const id = useId(), format = FORMATS[value.format], current = getTemplate(value.template_id, value.template_version);
   const choose = template => {
     if (value.template_id === template.id && value.template_version === template.version) return;
@@ -12,7 +12,7 @@ export default function TemplateSelector({ value, onChange, disabled = false }) 
     <div data-tour="studio-formats" className="space-y-2"><label htmlFor={id} className="text-sm font-medium">Formato</label><select id={id} value={value.format} onChange={e => onChange({ ...value, format: e.target.value })} className="w-full min-h-11 rounded-md border border-input bg-background px-3 py-2 text-sm">
       {Object.entries(FORMATS).map(([key, f]) => <option key={key} value={key}>{key} · {f.label} · {f.width} × {f.height}</option>)}
     </select></div>
-    <div data-tour="studio-templates"><p className="text-sm font-medium mb-2">Posizione di testi e logo</p><div className="grid grid-cols-2 sm:grid-cols-3 gap-2">{TEMPLATES.map(t => {
+    {integrated || value.text_mode === 'image' ? <p className="text-xs text-muted-foreground">L’AI progetta la disposizione insieme alla foto. Se cambi formato, premi Rigenera per adattare anche le scritte.</p> : <><div data-tour="studio-templates"><p className="text-sm font-medium mb-2">Posizione di testi e logo</p><div className="grid grid-cols-2 sm:grid-cols-3 gap-2">{TEMPLATES.map(t => {
       const layout = t.layouts[value.format], foreground = '#202C32';
       const selected = value.template_id === t.id && value.template_version === t.version;
       const rect = b => ({ x: b.x * 100, y: b.y * 100, width: b.width * 100, height: b.height * 100 });
@@ -33,6 +33,6 @@ export default function TemplateSelector({ value, onChange, disabled = false }) 
       </button>;
     })}</div></div>
     <p className="text-xs text-muted-foreground" aria-live="polite">{current.overlay ? current.description : 'Questo post conserva il template precedente. Scegli uno schema qui sopra per applicare testi e logo sulla foto a pieno sfondo.'}</p>
-    <p className="text-xs text-muted-foreground">Applicare un altro schema ripristina posizioni e dimensioni. Puoi poi personalizzare ogni elemento. Queste modifiche non usano l’AI.</p>
+    <p className="text-xs text-muted-foreground">Applicare un altro schema ripristina posizioni e dimensioni. Puoi poi personalizzare ogni elemento. Queste modifiche non usano l’AI.</p></>}
   </fieldset>;
 }

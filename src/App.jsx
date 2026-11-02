@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { Toaster as SonnerToaster } from "sonner";
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -83,6 +83,11 @@ const AuthenticatedApp = () => {
 };
 
 
+function AppNotifications() {
+  const { pathname } = useLocation();
+  return <SonnerToaster className="app-notifications" position={pathname === '/studio' ? 'top-center' : 'bottom-right'} offset={{ top: 80, bottom: 24, left: 24, right: 24 }} mobileOffset={{ top: 'calc(80px + env(safe-area-inset-top))', bottom: 88, left: 16, right: 16 }} />;
+}
+
 function App() {
   useDarkMode();
 
@@ -94,9 +99,9 @@ function App() {
           <TooltipProvider delayDuration={350} skipDelayDuration={100}><TourProvider>
             <AuthenticatedApp />
           </TourProvider></TooltipProvider>
+          <AppNotifications />
         </Router>
         <Toaster />
-        <SonnerToaster />
       </QueryClientProvider>
     </AuthProvider>
   )

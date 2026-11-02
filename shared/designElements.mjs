@@ -58,7 +58,7 @@ export function logoBackdropBox(box, size = 1) {
 /** Anche lo sfondo allargato occupa spazio nella composizione; uno sfondo spento lascia solo il logo. */
 export function elementFootprint(design, role, box) {
   const style = design.elements?.logo;
-  if (role !== 'logo' || style?.backdrop_opacity === 0) return box;
+  if (role !== 'logo' || design.transparent_overlays || style?.backdrop_opacity === 0) return box;
   const size = Math.max(1, style?.backdrop_size || 1), area = logoBackdropBox(box, size), feather = .01 * (size - 1);
   return { x: area.x - feather, y: area.y - feather, width: area.width + feather * 2, height: area.height + feather * 2 };
 }

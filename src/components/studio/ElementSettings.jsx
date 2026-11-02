@@ -70,8 +70,8 @@ function TextComposition({ role, item, design, headline, patch, onChange }) {
         <label className="flex items-center gap-3 min-h-11 text-sm"><input type="checkbox" checked={emphasis.separate_line} onChange={event => accent({ separate_line: event.target.checked })} />Parola su una riga dedicata</label>
       </div>}
     </>}
-    <div><label htmlFor="text-backdrop" className="block text-sm mb-1">Sfondo della scritta</label><select id="text-backdrop" className={fieldClass} value={backdrop.style} onChange={event => patch({ backdrop: { ...backdrop, style: event.target.value } })}><option value="auto">Contrasto automatico</option><option value="none">Nessuno</option><option value="brush">Pennellata</option></select></div>
-    {backdrop.style === 'brush' && <>
+    {!design.transparent_overlays && <div><label htmlFor="text-backdrop" className="block text-sm mb-1">Sfondo della scritta</label><select id="text-backdrop" className={fieldClass} value={backdrop.style} onChange={event => patch({ backdrop: { ...backdrop, style: event.target.value } })}><option value="auto">Contrasto automatico</option><option value="none">Nessuno</option><option value="brush">Pennellata</option></select></div>}
+    {!design.transparent_overlays && backdrop.style === 'brush' && <>
       <ColorField label="Colore della pennellata" value={backdrop.color} onChange={color => patch({ backdrop: { ...backdrop, color } })} />
       <div><label htmlFor="text-backdrop-opacity" className="block text-sm mb-1">Intensità della pennellata: {Math.round(backdrop.opacity * 100)}%</label><input id="text-backdrop-opacity" className="w-full h-11" type="range" min="0" max="100" step="1" value={backdrop.opacity * 100} onChange={event => patch({ backdrop: { ...backdrop, opacity: Number(event.target.value) / 100 } })} /></div>
       <p className="text-xs text-muted-foreground">La pennellata segue le dimensioni del riquadro. Spostando o ingrandendo il titolo, si muove insieme alle scritte.</p>
@@ -80,7 +80,8 @@ function TextComposition({ role, item, design, headline, patch, onChange }) {
 }
 
 export default function ElementSettings({ design, onChange, selected, onSelect, layout, onBusyChange, copy, onCopyChange }) {
-  const role = selected || 'heading', item = design.elements?.[role] || {};
+  const embedded = design.text_mode === 'image';
+  const role = embedded ? 'logo' : selected || 'heading', item = design.elements?.[role] || {};
   const box = Number.isFinite(item.x) ? item : layout[role]?.box || designLayout(design)[role];
   const fontSize = item.font_size || layout[role]?.fontSize || (role === 'heading' ? 72 : 36);
   const patch = value => onChange(current => changeElement(current, role, value));
@@ -96,12 +97,14 @@ export default function ElementSettings({ design, onChange, selected, onSelect, 
     return { ...current, elements };
   });
   return <section className="space-y-4" aria-label="Modifica elementi">
-    <div><label htmlFor="studio-element" className="block text-sm font-medium mb-2">Elemento da modificare</label><select id="studio-element" className={fieldClass} value={role} onChange={event => onSelect(event.target.value)}>{Object.entries(ELEMENT_LABELS).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></div>
+    {embedded && <p className="text-sm text-muted-foreground">Le scritte fanno parte della grafica AI. Per cambiarle, aggiorna “Cosa vuoi comunicare?” e premi Rigenera. Il logo resta spostabile e ridimensionabile.</p>}
+    {!design.transparent_overlays && <div className="space-y-2"><p className="text-xs text-muted-foreground">Questo post conserva le impostazioni precedenti degli sfondi.</p><button type="button" className="min-h-11 text-sm underline" onClick={() => onChange(current => ({ ...current, transparent_overlays: true }))}>Rimuovi sfondi da testo e logo</button></div>}
+    <div><label htmlFor="studio-element" className="block text-sm font-medium mb-2">Elemento da modificare</label><select id="studio-element" className={fieldClass} value={role} onChange={event => onSelect(event.target.value)}>{Object.entries(ELEMENT_LABELS).filter(([key]) => !embedded || key === 'logo').map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></div>
     {role !== 'logo' && <div><label htmlFor="element-text" className="block text-sm mb-1">{role === 'heading' ? 'Titolo grafica' : 'Testo di supporto'}</label><textarea id="element-text" className={fieldClass} rows={2} maxLength={200} value={copy?.[role === 'heading' ? 'headline' : 'graphic_subtitle'] || ''} onChange={event => onCopyChange({ ...copy, [role === 'heading' ? 'headline' : 'graphic_subtitle']: event.target.value })} /></div>}
     {role === 'logo' && !Object.values(design.brand.logos).some(logo => logo.url) ? <p className="text-sm text-muted-foreground">Carica il logo nella sezione “Loghi e colori del post” qui sotto.</p> : <>
       <div className="grid grid-cols-2 gap-3">{[['x', 'Orizzontale'], ['y', 'Verticale']].map(([key, label]) => <div key={key}><label htmlFor={'element-' + key} className="block text-sm mb-1">{label} (%)</label><input id={'element-' + key} className={fieldClass} type="number" inputMode="decimal" min="0" max={(100 * (1 - box[key === 'x' ? 'width' : 'height'])).toFixed(1)} step="0.1" value={+(box[key] * 100).toFixed(1)} onChange={event => { if (event.target.value !== '' && Number.isFinite(event.target.valueAsNumber)) patch(moveBox(box, key === 'x' ? event.target.valueAsNumber / 100 : box.x, key === 'y' ? event.target.valueAsNumber / 100 : box.y)); }} /></div>)}</div>
       <div><label htmlFor="element-width" className="block text-sm mb-1">Larghezza nella grafica: {+(box.width * 100).toFixed(1)}%</label><input id="element-width" type="range" min="1" max="100" step="0.5" value={box.width * 100} className="w-full h-11" onChange={event => scale(Number(event.target.value) / 100 / box.width)} /></div>
-      {role === 'logo' && <fieldset className="space-y-3 border-t pt-3">
+      {role === 'logo' && !design.transparent_overlays && <fieldset className="space-y-3 border-t pt-3">
         <legend className="text-sm font-medium">Sfondo del logo</legend>
         <div><label htmlFor="logo-backdrop-opacity" className="block text-sm mb-1">Intensità dello sfondo: {backdropOpacity}%{item.backdrop_opacity === undefined ? ' (automatica)' : ''}</label><input id="logo-backdrop-opacity" type="range" min="0" max="100" step="1" value={backdropOpacity} className="w-full h-11" onChange={event => patch({ backdrop_opacity: Number(event.target.value) / 100 })} /></div>
         <div><label htmlFor="logo-backdrop-size" className="block text-sm mb-1">Dimensione dello sfondo: {Math.round((item.backdrop_size || 1) * 100)}%</label><input id="logo-backdrop-size" type="range" min="50" max="250" step="5" value={(item.backdrop_size || 1) * 100} className="w-full h-11" onChange={event => patch({ backdrop_size: Number(event.target.value) / 100 })} /></div>

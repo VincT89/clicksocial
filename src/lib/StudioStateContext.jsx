@@ -6,6 +6,7 @@ import { Preferences } from '@capacitor/preferences';
 import { App } from '@capacitor/app';
 import { restoreStudioDraft, draftStorageKey } from './studioDraft.mjs';
 import { toast } from 'sonner';
+import { DEFAULT_MODE } from '../../shared/postDefaults.mjs';
 
 // Stato globale dello Studio: preserva la bozza attiva (foto, copy, filtri)
 // quando l'utente cambia tab dalla barra di navigazione mobile e poi torna.
@@ -22,8 +23,9 @@ export function StudioStateProvider({ children }) {
   const draftRevision = useRef(0);
   const [originalUrl, setOriginalUrl] = useState(null);
   const [platform, setPlatform] = useState("Instagram");
-  const [tone, setTone] = useState("amichevole");
-  const [mode, setMode] = useState("original");
+  /** Il tono non personalizzato segue il profilo aggiornato quando si apre lo Studio. */
+  const [tone, setTone] = useState(null);
+  const [mode, setMode] = useState(DEFAULT_MODE);
   const [title, setTitle] = useState("");
   const [context, setContext] = useState("");
   const [generating, setGenerating] = useState(false);
@@ -53,7 +55,7 @@ export function StudioStateProvider({ children }) {
     persist(latestDraft.current);
     latestDraft.current = null;
     draftRevision.current++;
-    setOriginalUrl(null); setPlatform('Instagram'); setTone('amichevole'); setMode('original');
+    setOriginalUrl(null); setPlatform('Instagram'); setTone(null); setMode(DEFAULT_MODE);
     setTitle(''); setContext(''); setCopy(null); setFilters({ ...DEFAULT_FILTERS });
     setActivePreset('Originale'); setEditingId(null); setPostStatus('bozza'); setGenerating(false);
     setDesign(null); setPlanning(null); setEditorialAt(null);
@@ -88,7 +90,7 @@ export function StudioStateProvider({ children }) {
     draftRevision.current++;
     setOriginalUrl(null);
     setCopy(null);
-    setMode("original");
+    setMode(DEFAULT_MODE); setTone(null);
     setTitle("");
     setContext("");
     setGenerating(false);

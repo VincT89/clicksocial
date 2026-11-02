@@ -160,6 +160,11 @@
 }
 
 @layer components {
+  .workspace-nav-link {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 48px; min-width: 56px; padding: 4px 2px; font-size: 12px; border-radius: 6px;
+  }
+  .workspace-nav-link[aria-current="page"] { color: hsl(var(--primary)); background: hsl(var(--accent)); font-weight: 600; }
+  .workspace-nav-link:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
   .nav-icon {
     @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50;
   }
@@ -200,4 +205,10 @@
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom);
   }
+}
+
+/** La centratura desktop non deve spostare gli avvisi fuori dallo schermo sui telefoni. */
+@media (max-width: 600px) {
+  .app-notifications[data-sonner-toaster][data-x-position='center'] { left: 16px; right: 16px; width: auto; transform: none; transition: none; }
+  .app-notifications[data-sonner-toaster][data-x-position='center'] [data-sonner-toast] { width: 100%; }
 }

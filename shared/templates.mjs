@@ -87,21 +87,31 @@ export function normalizeDesign(value, profile = {}) {
   const logoVariant = value.logo_variant || 'auto';
   if (!['auto', 'color', 'light', 'dark'].includes(logoVariant)) throw new Error('Variante del logo non valida.');
   if (value.ai_text_style !== undefined && typeof value.ai_text_style !== 'boolean') throw new Error('Opzione dello stile automatico non valida.');
+  if (value.transparent_overlays !== undefined && typeof value.transparent_overlays !== 'boolean') throw new Error('Opzione degli elementi senza sfondo non valida.');
+  if (value.text_mode !== undefined && !['editable', 'image'].includes(value.text_mode)) throw new Error('Modalità delle scritte non valida.');
+  if (value.graphic_format !== undefined && (value.text_mode !== 'image' || !Object.hasOwn(FORMATS, value.graphic_format))) throw new Error('Formato della grafica generata non valido.');
   return { template_id: template.id, template_version: template.version, format: value.format,
     brand: value.brand ? normalizeBrand(value.brand) : brandFromProfile(profile),
     logo_variant: logoVariant, crop: { x: crop.x, y: crop.y },
     ...(value.ai_text_style === undefined ? {} : { ai_text_style: value.ai_text_style }),
+    ...(value.transparent_overlays === undefined ? {} : { transparent_overlays: value.transparent_overlays }),
+    ...(value.text_mode === undefined ? {} : { text_mode: value.text_mode }),
+    ...(value.graphic_format === undefined ? {} : { graphic_format: value.graphic_format }),
     ...(value.elements === undefined ? {} : { elements: normalizeElements(value.elements) }) };
 }
 export function designLayout(design) {
   const base = getTemplate(design.template_id, design.template_version).layouts[design.format];
-  return { ...base, ...Object.fromEntries(['heading', 'subtitle', 'logo'].map(role => [role,
+  return { ...base, ...(design.text_mode === 'image' ? { photo: box(0, 0, 1, 1) } : {}), ...Object.fromEntries(['heading', 'subtitle', 'logo'].map(role => [role,
     Number.isFinite(design.elements?.[role]?.x) ? Object.fromEntries(['x', 'y', 'width', 'height'].map(key => [key, design.elements[role][key]])) : base[role]])) };
 }
 export function defaultDesign(profile = {}) {
   profile ||= {};
   const template = getTemplate(profile.preferred_template || 'foto');
   return normalizeDesign({ template_id: template.id, template_version: template.version, format: '1:1' }, profile);
+}
+/** I nuovi post sono pronti per la generazione; i documenti già salvati mantengono le loro impostazioni. */
+export function newPostDesign(profile = {}) {
+  return { ...defaultDesign(profile), ai_text_style: true, transparent_overlays: true };
 }
 export function designBrief(design, roles = ['heading', 'subtitle', 'logo']) {
   const t = getTemplate(design.template_id, design.template_version);

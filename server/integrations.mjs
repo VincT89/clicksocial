@@ -7,11 +7,12 @@ import { ownedImage, saveImage, sniffImage } from './files.mjs';
 import { resolveLogoAnalysis } from '../src/lib/logoPlacement.js';
 import { aiResponseMetadata, pricedAiLog } from './ai-pricing.mjs';
 import { validateDesign } from './design.mjs';
-import { designBrief, imageRequestSize, getTemplate } from '../shared/templates.mjs';
+import { designBrief, imageRequestSize, getTemplate, newPostDesign } from '../shared/templates.mjs';
 import { editablePost } from './editorial.mjs';
-import { activeCompositionRoles, composePhoto, compositionPrompt, compositionSchema } from './composition.mjs';
+import { activeCompositionRoles, composePhoto, compositionInstructions, compositionSchema, compositionDiagnostic } from './composition.mjs';
 import { isManualElement } from '../shared/designElements.mjs';
 import { applyTextStyle, textStylePrompt, textStyleSchema } from './textStyle.mjs';
+import { integratedGraphicPrompt } from './integratedGraphic.mjs';
 
 export function createIntegrations(db, config, fetchImpl = fetch) {
   const social = createSocialConnections(db, config, fetchImpl);
@@ -31,7 +32,7 @@ export function createIntegrations(db, config, fetchImpl = fetch) {
     /** L’analisi delle aree fotografiche richiede spazio aggiuntivo per coordinate strutturate. */
     ...(config.textModel === 'gpt-5.6-luna' ? {
       reasoning: { effort: phase === 'logo' ? 'low' : 'none' },
-      max_output_tokens: phase === 'logo' ? 8000 : phase === 'connection' ? 32 : phase === 'copy_composition' ? 3600 : phase === 'composition' ? 2600 : 1200,
+      max_output_tokens: phase === 'logo' ? 8000 : phase === 'connection' ? 32 : phase === 'copy_composition' ? 4200 : phase === 'composition' ? 3200 : 1200,
     } : {}),
   });
   async function sendMail(recipient, subject, body) {
@@ -69,8 +70,9 @@ export function createIntegrations(db, config, fetchImpl = fetch) {
   async function generateCopy(user, body) {
     aiReady();
     const platform = ['instagram', 'facebook', 'tiktok'].includes(body.platform) ? body.platform : 'instagram';
-    const tone = ['amichevole', 'professionale', 'divertente', 'elegante'].includes(body.tone) ? body.tone : 'amichevole';
-    const mode = ['original', 'enhance', 'creative'].includes(body.mode) ? body.mode : 'original';
+    const tone = ['amichevole', 'professionale', 'ispirazionale', 'divertente', 'elegante'].includes(body.tone) ? body.tone : 'amichevole';
+    const mode = ['original', 'enhance', 'creative', 'graphic'].includes(body.mode) ? body.mode : 'original';
+    const integrated = mode === 'graphic';
     if (mode !== 'original' && !config.imageModel) fail(503, 'Configura AI_IMAGE_MODEL per ritoccare o generare immagini.', 'integration_unconfigured');
     const image = (await ownedImage(db, config, user, body.file_url));
     const record = (await db.prepare('SELECT * FROM users WHERE id=?').get(user.id));
@@ -82,12 +84,30 @@ export function createIntegrations(db, config, fetchImpl = fetch) {
       if (!row) fail(404, 'Bozza non trovata.');
       draft = JSON.parse(row.data); editablePost(draft);
     }
-    const designInput = body.design || draft?.design;
+    const designInput = body.design || draft?.design || (integrated ? newPostDesign(company) : null);
     let design = designInput ? await validateDesign(db, config, user, designInput, company) : null;
-    let brief = design ? designBrief(design) : null;
-    const checkComposition = !!design && getTemplate(design.template_id, design.template_version).overlay;
+    if (design) {
+      design = { ...design, transparent_overlays: true };
+      delete design.text_mode; delete design.graphic_format;
+      if (integrated) design = { ...design, text_mode: 'image', graphic_format: design.format, crop: { x: .5, y: .5 } };
+    }
+    const logoSettings = integrated ? (design.logo_variant === 'auto' ? Object.values(design.brand.logos).find(logo => logo.url) : design.brand.logos[design.logo_variant]) : null;
+    if (integrated && design.logo_variant !== 'auto' && !logoSettings?.url) fail(400, 'Questa variante del logo non è caricata. Scegli Automatico oppure un’altra variante.');
+    const integratedLogo = logoSettings?.url ? await ownedImage(db, config, user, logoSettings.url) : null;
+    const photoBrief = (value, roles) => {
+      const description = designBrief(value, roles);
+      return !description.reserved_areas ? description : { ...description,
+        arrangement: 'Scegli la composizione in base alla foto. Conserva solo le posizioni manuali; quelle automatiche sono suggerimenti.',
+        manual_areas: description.reserved_areas.filter(area => isManualElement(value.elements?.[area.role])),
+        automatic_areas_are_suggestions: true,
+      };
+    };
+    let brief = design && !integrated ? photoBrief(design) : null;
+    const checkComposition = !!design && (integrated || getTemplate(design.template_id, design.template_version).overlay);
     const analyzeOriginal = checkComposition && mode === 'original';
-    const styleWithCopy = !!design?.ai_text_style && (mode === 'original' || !checkComposition);
+    const styleWithCopy = !integrated && !!design?.ai_text_style && (mode === 'original' || !checkComposition);
+    /** Il ritaglio della foto originale viene validato prima di impegnare la quota dell’utente. */
+    const originalInstructions = analyzeOriginal ? compositionInstructions(design, image.bytes) : '';
     let reserved = false;
     if (record.plan !== 'pro') {
       reserved = (await db.prepare('UPDATE users SET ai_used=ai_used+1 WHERE id=? AND ai_used<2').run(user.id)).changes === 1;
@@ -95,6 +115,13 @@ export function createIntegrations(db, config, fetchImpl = fetch) {
     }
     const started = Date.now();
     let imageAttempted = false, imageGenerated = false, logoPlacement, compositionAdjusted = false;
+    let compositionDetails;
+    const compose = (copy, analysis, bytes) => {
+      compositionDetails = compositionDiagnostic(analysis);
+      const composed = composePhoto(design, copy, analysis, bytes);
+      compositionDetails.strategy = composed.strategy || (composed.adjusted ? 'fallback' : 'existing');
+      design = composed.design; compositionAdjusted = composed.adjusted;
+    };
     const calls = [];
     const usageLog = () => {
       const usages = calls.filter(call => call.kind === 'responses').map(call => call.usage);
@@ -116,9 +143,11 @@ export function createIntegrations(db, config, fetchImpl = fetch) {
       draft?.planning ? 'Bozza editoriale salvata. Usa obiettivo, appunti e testo provvisorio; gli scatti richiesti sono indicazioni di preparazione, non fatti già visibili nella foto: ' + JSON.stringify(draft.planning) : '',
       brief ? 'Template applicato dall’app: ' + JSON.stringify(brief) + '. Scrivi anche un sottotitolo breve, oppure una stringa vuota se non serve. Il testo deve rispettare gli spazi disponibili.' : '',
       brief ? 'Il titolo deve sembrare parte della composizione fotografica: conciso, con un solo messaggio. Il sottotitolo è facoltativo, massimo 8 parole: omettilo quando ripete il titolo o riduce lo spazio per il soggetto. Non aggiungere slogan generici, superlativi o promesse non documentate.' : '',
-      analyzeOriginal ? compositionPrompt : '',
+      integrated ? 'Prepara il messaggio di una grafica completa: fotografia e scritte saranno progettate insieme dall’AI. Il titolo deve essere concreto e riconoscibile, con una parola principale valorizzabile, evitando formule generiche intercambiabili. graphic_subtitle è facoltativo: usa una stringa vuota se non aggiunge un’informazione utile fornita dall’utente. I dettagli estesi appartengono alla caption.' : '',
+      originalInstructions,
       styleWithCopy ? textStylePrompt(design) : '',
       'Richiesta specifica: ' + context,
+      'Se la richiesta specifica indica un’offerta o un messaggio, rendilo il tema del post. Mantieni esatti prodotti, prezzi, quantità e validità forniti; metti l’informazione principale nel titolo e i dettagli nella caption. Non inventare sconti, omaggi, scadenze, condizioni o disponibilità e non sostituire il messaggio con una descrizione generica della foto. Se la richiesta è vuota, ispirati alla foto e ai dati reali del brand.',
       'La richiesta deve essere coerente con titolo e caption. Scrivi in italiano, senza emoji.',
       'headline: un solo messaggio, massimo 5 parole e 60 caratteri, comprensibile da solo e adatto a essere letto su smartphone. Non trasformarlo in una frase lunga né in un elenco.',
       'caption: massimo 1500 caratteri, senza hashtag; raccogli qui dettagli, date e informazioni secondarie reali che appesantirebbero la grafica. hashtags: massimo 12, separati da spazi.',
@@ -137,20 +166,18 @@ export function createIntegrations(db, config, fetchImpl = fetch) {
       if (!['headline','caption','hashtags'].every(k => typeof result[k] === 'string')) fail(502, 'Risposta AI incompleta.');
       if (design) {
         const template = getTemplate(design.template_id, design.template_version);
-        if (typeof result.graphic_subtitle !== 'string' || result.headline.length > template.maxHeadline || result.graphic_subtitle.length > brief.max_subtitle) fail(502, 'Il testo generato supera lo spazio del template. Accorcia la richiesta e riprova.');
+        if (typeof result.graphic_subtitle !== 'string' || result.headline.length > template.maxHeadline || result.graphic_subtitle.length > (integrated ? 90 : brief.max_subtitle)) fail(502, 'Il testo generato supera lo spazio della grafica. Accorcia la richiesta e riprova.');
       }
       if (styleWithCopy) design = applyTextStyle(design, result.text_style, result.headline);
       delete result.text_style;
       if (analyzeOriginal) {
-        const composed = composePhoto(design, result, result.composition, image.bytes);
-        design = composed.design; compositionAdjusted = composed.adjusted;
+        compose(result, result.composition, image.bytes);
       }
       delete result.composition;
       let graphicUrl;
       if (mode !== 'original') {
-        if (checkComposition) {
-          brief = designBrief(design, activeCompositionRoles(design, result));
-          if (!brief.subject_area && activeCompositionRoles(design, result).some(role => !isManualElement(design.elements?.[role]))) fail(400, 'Le scritte e il logo occupano troppo spazio per mantenere il soggetto nella foto. Riduci o sposta i riquadri nello Studio.');
+        if (checkComposition && !integrated) {
+          brief = photoBrief(design, activeCompositionRoles(design, result));
         }
         imageAttempted = true;
         const form = new FormData();
@@ -158,13 +185,14 @@ export function createIntegrations(db, config, fetchImpl = fetch) {
         form.set('image', new Blob([image.bytes], { type: image.mime }), image.name);
         form.set('size', imageRequestSize(design, config.imageModel));
         form.set('n', '1');
-        form.set('prompt', design ? [
+        form.set('prompt', integrated ? integratedGraphicPrompt(design, result, context, company, !!integratedLogo, form.get('size')) : design ? [
           mode === 'enhance' ? 'Ritocca la fotografia mantenendo il soggetto, l’identità e i dettagli reali. Migliora luce e colore in modo naturale.' : 'Crea una fotografia editoriale coerente con il soggetto originale e il brand. Conserva identità e dettagli riconoscibili.',
           'Genera SOLO la parte fotografica. Il template, i testi e il logo verranno composti separatamente da ClickSocial.',
+          'Non dipingere sfondi, pennellate, pannelli opachi o traslucidi dietro a testi e logo. Le scritte saranno direttamente sulla fotografia: usa zone naturali uniformi e contrasti adatti alla lettura.',
           checkComposition ? 'Progetta fotografia e tipografia come una sola composizione editoriale: soggetto riconoscibile, punto di vista coerente, luce credibile e spazio negativo naturale che accompagni la lettura. Le scritte devono sembrare pensate insieme allo scatto, non incollate sopra il soggetto.' : '',
           'Non aggiungere titoli, sottotitoli, scritte, loghi, cornici, watermark o segnaposto. Mantieni le scritte reali già presenti su oggetti e prodotti senza inventarne altre.',
-          brief.reserved_areas && !brief.subject_area ? 'Le posizioni di testi e logo sono state scelte manualmente e saranno mantenute dall’app. Conserva i soggetti e i dettagli reali della fotografia; non deformarli o eliminarli per lasciare spazio alle scritte.' : brief.reserved_areas
-            ? 'La foto deve riempire tutto il fotogramma. ClickSocial sovrapporrà titolo, sottotitolo e logo nelle reserved_areas: mantieni queste zone e i loro margini semplici e visivamente tranquilli, con sfondo fotografico continuo. Non collocarvi volti, prodotti, scritte reali o dettagli importanti. Nessun pannello, fascia, cornice, collage o riquadro visibile. Concentra il soggetto importante nella subject_area, rispettando l’arrangement indicato. Le coordinate si riferiscono alla foto intera. Non disegnare i testi o il logo e non trasformare gli spazi liberi in rettangoli vuoti.'
+          brief.reserved_areas && activeCompositionRoles(design, result).every(role => isManualElement(design.elements?.[role])) ? 'Le posizioni di testi e logo sono state scelte manualmente e saranno mantenute dall’app. Conserva i soggetti e i dettagli reali della fotografia; non deformarli o eliminarli per lasciare spazio alle scritte.' : brief.reserved_areas
+            ? 'La foto deve riempire tutto il fotogramma. Scegli una composizione fotografica naturale che lasci spazio leggibile per un titolo breve e il logo. Le reserved_areas automatiche e la subject_area sono suggerimenti, non una griglia obbligatoria: scegli tu gli spazi migliori nella scena, anche separati. Soltanto le manual_areas sono vincolanti. Mantieni lo sfondo fotografico continuo; non collocare volti, prodotti o scritte reali negli spazi scelti per il testo. Nessun pannello, fascia, cornice, collage o riquadro visibile. Le coordinate si riferiscono alla foto intera. Non disegnare testi o logo e non trasformare gli spazi liberi in rettangoli vuoti.'
             : 'Non creare aree vuote per il testo all’interno della fotografia: i testi verranno applicati fuori dall’area fotografica.',
           checkComposition ? 'Nelle aree riservate evita linee forti, texture fitte e contrasti locali che attraverserebbero le lettere. Usa soltanto lo sfondo naturale della scena, non superfici artificiali aggiunte per ospitare il testo. Evita filtri vistosi, bagliori, decorazioni e sfocature sul soggetto.' : '',
           checkComposition ? (mode === 'enhance' ? 'Per creare respiro puoi ampliare leggermente lo sfondo o l’inquadratura; non eliminare o deformare persone, mani, prodotti o dettagli autentici. Non cambiare il contenuto del prodotto per fare spazio.' : 'Puoi ricomporre l’ambientazione e il punto di ripresa per ottenere respiro intorno al soggetto, conservandone identità, proporzioni, dettagli e colori reali.') : '',
@@ -195,18 +223,17 @@ export function createIntegrations(db, config, fetchImpl = fetch) {
         if (!graphic.data?.[0]?.b64_json) fail(502, 'Il servizio immagini non ha restituito un file.');
         const graphicBytes = Buffer.from(graphic.data[0].b64_json, 'base64');
         imageGenerated = true;
-        if (checkComposition) {
+        if (checkComposition && (!integrated || integratedLogo)) {
           if (!graphicBytes.length || graphicBytes.length > 15 * 1024 * 1024) fail(502, 'La foto generata è vuota o troppo grande.');
           const inspection = await textResponse('composition', {
-            input: [{ role: 'user', content: [{ type: 'input_text', text: [compositionPrompt, design.ai_text_style ? textStylePrompt(design) + '\nTesti esatti da impaginare: ' + JSON.stringify({ heading: result.headline, subtitle: result.graphic_subtitle }) : ''].filter(Boolean).join('\n') }, { type: 'input_image', image_url: 'data:' + sniffImage(graphicBytes) + ';base64,' + graphicBytes.toString('base64') }] }],
-            text: { format: { type: 'json_schema', name: 'photo_composition', strict: true, schema: { type: 'object', properties: { composition: compositionSchema, ...(design.ai_text_style ? { text_style: textStyleSchema } : {}) }, required: ['composition', ...(design.ai_text_style ? ['text_style'] : [])], additionalProperties: false } } },
+            input: [{ role: 'user', content: [{ type: 'input_text', text: [compositionInstructions(design, graphicBytes, result), !integrated && design.ai_text_style ? textStylePrompt(design) : ''].filter(Boolean).join('\n') }, { type: 'input_image', image_url: 'data:' + sniffImage(graphicBytes) + ';base64,' + graphicBytes.toString('base64') }, ...(integratedLogo ? [{ type: 'input_image', image_url: 'data:' + integratedLogo.mime + ';base64,' + integratedLogo.bytes.toString('base64') }] : [])] }],
+            text: { format: { type: 'json_schema', name: 'photo_composition', strict: true, schema: { type: 'object', properties: { composition: compositionSchema, ...(!integrated && design.ai_text_style ? { text_style: textStyleSchema } : {}) }, required: ['composition', ...(!integrated && design.ai_text_style ? ['text_style'] : [])], additionalProperties: false } } },
           });
           let analysis;
           try { analysis = JSON.parse((inspection.output || []).flatMap(item => item.content || []).filter(item => item.type === 'output_text').map(item => item.text).join('')); }
           catch { fail(502, 'L’AI non ha restituito un’analisi valida della fotografia generata.'); }
-          if (design.ai_text_style) design = applyTextStyle(design, analysis.text_style, result.headline);
-          const composed = composePhoto(design, result, analysis.composition, graphicBytes);
-          design = composed.design; compositionAdjusted = composed.adjusted;
+          if (!integrated && design.ai_text_style) design = applyTextStyle(design, analysis.text_style, result.headline);
+          compose(result, analysis.composition, graphicBytes);
         }
         /** Salviamo la nuova fotografia solo dopo aver verificato che la composizione sia utilizzabile. */
         graphicUrl = (await saveImage(db, config, user, graphicBytes, 'grafica.png')).file_url;
@@ -260,11 +287,11 @@ export function createIntegrations(db, config, fetchImpl = fetch) {
           catch (error) { fail(502, error.message); }
         }
       }
-      (await logAi(user, { operation: 'generateCopy', company_name: company.company_name || '', platform, mode, tone, status: 'success', ...usageLog(), latency_ms: Date.now() - started, image_attempted:imageAttempted, image_model:imageAttempted ? config.imageModel : null, image_generated:imageGenerated, ...(checkComposition ? { composition_adjusted: compositionAdjusted } : {}), ...(logoPlacement ? { logo_placement:logoPlacement } : {}) }, calls));
-      return { ...result, graphic_url: graphicUrl, ...(design ? { design } : {}), ...(checkComposition ? { composition_adjusted: compositionAdjusted } : {}), ...(logoPlacement ? { logo_url:company.company_logo_url, logo_placement:logoPlacement } : {}) };
+      (await logAi(user, { operation: 'generateCopy', company_name: company.company_name || '', platform, mode, tone, status: 'success', ...usageLog(), latency_ms: Date.now() - started, image_attempted:imageAttempted, image_model:imageAttempted ? config.imageModel : null, image_generated:imageGenerated, ...(checkComposition ? { composition_adjusted: compositionAdjusted, composition_details: compositionDetails } : {}), ...(logoPlacement ? { logo_placement:logoPlacement } : {}) }, calls));
+      return { ...result, generated_mode: mode, graphic_url: graphicUrl, ...(design ? { design } : {}), ...(checkComposition ? { composition_adjusted: compositionAdjusted } : {}), ...(logoPlacement ? { logo_url:company.company_logo_url, logo_placement:logoPlacement } : {}) };
     } catch (error) {
       if (reserved) (await db.prepare(SQL.refundAI).run(user.id));
-      (await logAi(user, { operation: 'generateCopy', company_name:company.company_name || '', platform, mode, tone, status: 'error', error: error.message, ...usageLog(), image_attempted:imageAttempted, image_model:imageAttempted ? config.imageModel : null, image_generated:imageGenerated, latency_ms: Date.now() - started }, calls));
+      (await logAi(user, { operation: 'generateCopy', company_name:company.company_name || '', platform, mode, tone, status: 'error', error: error.message, ...usageLog(), image_attempted:imageAttempted, image_model:imageAttempted ? config.imageModel : null, image_generated:imageGenerated, latency_ms: Date.now() - started, ...(compositionDetails ? { composition_details: compositionDetails } : {}) }, calls));
       throw error;
     }
   }

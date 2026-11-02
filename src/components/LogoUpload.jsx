@@ -80,7 +80,7 @@ export default function LogoUpload({ logoUrl, onChange, label = 'Logo aziendale 
           >
             {uploading ? "Caricamento…" : logoUrl ? "Sostituisci logo" : "Carica un logo"}
           </button>
-          <p className="text-xs text-muted-foreground mt-1">Il marchio conserva colori e proporzioni. Nei template ha uno spazio dedicato.</p>
+          <p className="text-xs text-muted-foreground mt-1">Il logo conserva colori e proporzioni. Potrai spostarlo sulla foto.</p>
         </div>
       </div>
       <input

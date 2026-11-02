@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '@/api/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -13,6 +13,7 @@ import { PLATFORMS } from '@/lib/editorialDates.mjs';
 import { isNative, openExternal } from '@/lib/mobile';
 
 export default function ScheduleDialog({ post, open, onOpenChange, onScheduled }) {
+  const sending = useRef(false);
   const [state, setState] = useState(null);
   const [pageId, setPageId] = useState('');
   const [when, setWhen] = useState('');
@@ -34,15 +35,16 @@ export default function ScheduleDialog({ post, open, onOpenChange, onScheduled }
     api.social.prepare(post.id).then(result => {
       if (!active) return;
       setState(result);
-      setPageId(result.accounts?.find(p => p.id === post.social_page_id)?.id || '');
+      setPageId(result.accounts?.find(p => p.id === post.social_page_id)?.id || (result.accounts?.length === 1 ? result.accounts[0].id : ''));
     }).catch(e => { if (active) setError(e.message); });
     return () => { active = false; };
   }, [open, post, retry]);
   const confirm = async () => {
+    if (sending.current || !state?.accounts?.some(account => account.id === pageId)) return;
     if (preview !== 'ready') { setError('Attendi il caricamento della foto prima di pubblicare.'); return; }
     const date = toInstant(when);
     if (scheduled && (!date || new Date(date).getTime() <= Date.now())) { setError('Scegli una data e un’ora future valide.'); return; }
-    setSaving(true); setError('');
+    sending.current = true; setSaving(true); setError('');
     try {
       let image_url = post.image_url;
       if (post.platform !== 'facebook') {
@@ -53,7 +55,7 @@ export default function ScheduleDialog({ post, open, onOpenChange, onScheduled }
       toast.success(scheduled ? 'Invio programmato. L’esito comparirà in Libreria.' : 'Invio in coda. Attendi la conferma del social in Libreria.');
       await onScheduled(); onOpenChange(false);
     } catch (e) { setError(e.message); }
-    finally { setSaving(false); }
+    finally { sending.current = false; setSaving(false); }
   };
   const ready = state?.accounts?.length > 0;
   const maximum = post.platform === 'instagram' ? 2200 : post.platform === 'tiktok' ? 4000 : 10000;
@@ -62,9 +64,10 @@ export default function ScheduleDialog({ post, open, onOpenChange, onScheduled }
   const external = event => { if (isNative) { event.preventDefault(); openExternal(event.currentTarget.href).catch(e => setError(e.message)); } };
   return <Dialog open={open} onOpenChange={value => { if (!saving) onOpenChange(value); }}>
     <DialogContent className="max-h-[90dvh] overflow-y-auto min-w-0">
-      <DialogHeader className="pr-6"><DialogTitle>Pubblica foto su {PLATFORMS[post.platform]}</DialogTitle><DialogDescription>Controlla foto, testo e account prima di confermare. Segui l’esito nella Libreria: il social può impiegare qualche minuto.</DialogDescription></DialogHeader>
+      <DialogHeader className="pr-6"><DialogTitle>Pubblica su {PLATFORMS[post.platform]}</DialogTitle><DialogDescription>Controlla immagine, descrizione e account prima di confermare. Segui l’esito nella Libreria: il social può impiegare qualche minuto.</DialogDescription></DialogHeader>
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       {!state && !error && <p role="status" className="text-sm">Verifica dell’account e dei permessi…</p>}
+      {state && !ready && <div className="space-y-3"><p className="text-sm">Il post è salvato. Collega un account {PLATFORMS[post.platform]} per pubblicarlo.</p><Button asChild><Link to="/profilo?section=social">Collega il social</Link></Button></div>}
       {!state && error && <div className="flex flex-wrap gap-3"><Button variant="outline" onClick={() => setRetry(value => value + 1)}>Riprova</Button><Button asChild variant="outline"><Link to="/profilo?section=social">Apri collegamenti social</Link></Button><Link className="min-h-11 py-3 text-sm underline" to="/profilo?section=plan">Controlla il piano</Link></div>}
       {ready && <>
         <Image src={post.image_url} alt="Foto che verrà inviata al social" className="max-h-52 w-full object-contain bg-secondary rounded-md" onLoad={event => setPreview(event.currentTarget.dataset.errorImage ? 'error' : 'ready')} onError={() => setPreview('error')} />
@@ -89,7 +92,7 @@ export default function ScheduleDialog({ post, open, onOpenChange, onScheduled }
           <label className="flex gap-3 items-start py-2 text-sm"><input type="checkbox" className="h-5 w-5 shrink-0" checked={options.music_consent} onChange={toggle('music_consent')} /><span>Pubblicando accetto la <a className="underline" href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noopener noreferrer" onClick={external}>conferma sull’uso della musica di TikTok</a>{options.brand_content_toggle && <> e la <a className="underline" href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" rel="noopener noreferrer" onClick={external}>normativa sui contenuti brandizzati</a></>}.</span></label>
         </fieldset>}
         <label className="flex gap-3 items-center min-h-11 text-sm"><input type="checkbox" className="h-5 w-5" checked={scheduled} onChange={e => setScheduled(e.target.checked)} disabled={saving} />Programma per una data futura</label>
-        {scheduled && <div className="space-y-2"><Label htmlFor="schedule-when">Data e ora dell’invio</Label><Input className="min-w-0 max-w-full" id="schedule-when" type="datetime-local" value={when} onChange={e => setWhen(e.target.value)} disabled={saving} /><p className="text-xs text-muted-foreground">Ora locale: {Intl.DateTimeFormat().resolvedOptions().timeZone}. Anche la data editoriale verrà aggiornata. Il server deve rimanere acceso.</p></div>}
+        {scheduled && <div className="space-y-2"><Label htmlFor="schedule-when">Data e ora dell’invio</Label><Input className="min-w-0 max-w-full" id="schedule-when" type="datetime-local" value={when} onChange={e => setWhen(e.target.value)} disabled={saving} /><p className="text-xs text-muted-foreground">Ora locale: {Intl.DateTimeFormat().resolvedOptions().timeZone}. Ritroverai il post nel calendario.</p></div>}
         <p className="text-sm break-words">{pageId ? 'Destinazione: ' + state.accounts.find(account => account.id === pageId)?.name + ' su ' + PLATFORMS[post.platform] + '.' : 'Seleziona un account prima di confermare.'}</p>
         <DialogFooter><Button className="min-h-11 whitespace-normal" onClick={confirm} disabled={saving || preview !== 'ready' || !pageId || caption.length > maximum || post.platform === 'tiktok' && (!options.privacy_level || !options.music_consent || options.commercial_disclosure && !options.brand_content_toggle && !options.brand_organic_toggle || options.brand_content_toggle && options.privacy_level === 'SELF_ONLY')}>{saving ? 'Invio della richiesta…' : scheduled ? 'Conferma programmazione' : 'Conferma pubblicazione'}</Button></DialogFooter>
       </>}

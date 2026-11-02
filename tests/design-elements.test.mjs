@@ -104,9 +104,13 @@ test('editor: il server conserva le modifiche del post e respinge accessi e asse
   assert.deepEqual((await request(path, undefined, 'GET')).body.design, design);
   assert.deepEqual((await request('/auth/me', undefined, 'GET')).body.brand_settings, profileBefore.brand_settings);
   assert.equal(aiCalls.length, 0, 'Le modifiche manuali non invocano l’AI');
-  const generated = await request('/functions/generateCopy', { file_url: photo.file_url, mode: 'original', platform: 'instagram', design });
+  const message = 'Oggi caffè a 1 euro';
+  const generated = await request('/functions/generateCopy', { file_url: photo.file_url, mode: 'original', platform: 'instagram', design, context: message });
   assert.equal(generated.status, 200);
-  assert.deepEqual(generated.body.design, design, 'La rigenerazione conserva la composizione personalizzata');
+  assert.deepEqual(generated.body.design, { ...design, transparent_overlays: true }, 'La rigenerazione conserva la composizione personalizzata e rimuove gli sfondi');
   assert.equal(aiCalls.length, 1);
-  assert.match(aiCalls[0].input[0].content[0].text, /Composizione personalizzata/);
+  assert.match(aiCalls[0].input[0].content[0].text, /Conserva solo le posizioni manuali/);
+  assert.match(aiCalls[0].input[0].content[0].text, /Posizioni fissate dall’utente/);
+  assert.ok(aiCalls[0].input[0].content[0].text.includes('Richiesta specifica: ' + message));
+  assert.match(aiCalls[0].input[0].content[0].text, /Mantieni esatti prodotti, prezzi, quantità e validità forniti/);
 });

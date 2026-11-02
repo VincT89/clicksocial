@@ -1,6 +1,6 @@
 # ClickSocial — guida all’uso
 
-Aggiornata il 30 ottobre 2026. Questa guida descrive le funzioni presenti nella copia locale APP: identità aziendale, editor dello Studio, cinque template, bozze editoriali, Libreria, collegamenti social e collaudo mobile. Le integrazioni social richiedono l’attivazione del gestore e il collaudo con account reali. ClickSocial è un progetto di [Sodano Consulting](https://sodanoconsulting.it/).
+Aggiornata il 2 novembre 2026. Questa guida descrive le funzioni presenti nella copia locale APP: creazione del post, personalizzazioni facoltative, bozze, Libreria, collegamenti social e collaudo mobile. Le integrazioni social richiedono l’attivazione del gestore e il collaudo con account reali. ClickSocial è un progetto di [Sodano Consulting](https://sodanoconsulting.it/).
 
 Per caricare il sito sul server e trasferire i dati consulta [PLESK.md](PLESK.md). Dopo il trasferimento usa l’indirizzo HTTPS comunicato dal gestore. L’app iPhone deve essere ricompilata per quel server: una build configurata con l’indirizzo del PC continua a richiederne la disponibilità. La programmazione dei post richiede inoltre che il gestore mantenga attivo il servizio o un’attività pianificata, anche quando nessuno visita il sito.
 
@@ -14,7 +14,7 @@ Ogni account vede la propria Libreria. L’amministratore gestisce utenti e pian
 
 ## Impostare l’identità aziendale
 
-Apri **Profilo → Attività**. Inserisci nome, categoria, valori e personalità dell’attività e il tono aziendale. Queste informazioni danno contesto alla generazione: usa dati reali, evitando informazioni commerciali da confermare.
+Al primo accesso bastano nome e categoria. Descrizione e logo sono facoltativi. In **Profilo → Attività** puoi aggiornare questi dati; **Personalizza lo stile dei nuovi post** raccoglie tono, varianti del logo, colori, font e schema iniziale. Usa informazioni reali.
 
 ### Loghi
 
@@ -33,9 +33,9 @@ Controlla sempre l’anteprima. La pulizia rimuove il fondo uniforme collegato a
 
 Nello Studio, apri l’ingranaggio, poi **Grafica → Loghi e colori del post → Variante del logo**. **Automatica in base al contrasto** sceglie fra i file caricati. Puoi anche scegliere una variante precisa. Il logo parte dalla posizione del template; puoi spostarlo e ridimensionarlo mantenendone proporzioni e colori.
 
-Per regolare lo sfondo dietro al marchio, apri **Grafica**, seleziona **Logo** in **Elemento da modificare** e usa **Sfondo del logo**. **Intensità dello sfondo** va da 0% (trasparente) a 100% (coprente); **Dimensione dello sfondo** va da 50% a 250% rispetto al riquadro del logo. Le dimensioni del marchio restano indipendenti. **Ripristina sfondo automatico** ripristina la correzione basata sul contrasto e la dimensione iniziale, conservando la posizione del logo. Le regolazioni vengono salvate nel post e applicate all’immagine esportata.
+Nelle nuove composizioni logo e scritte sono senza sfondo: niente pannelli, aloni o pennellate aggiunte. I vecchi post conservano l’aspetto salvato. Per togliere i loro fondini, scegli **Grafica → Rimuovi sfondi da testo e logo** e salva. La rigenerazione applica sempre la composizione senza sfondi.
 
-Il contrasto considera anche la trasparenza del marchio. Se non basta la correzione locale del fondo, compare un avviso sotto l’anteprima: la fotografia e il logo rimangono visibili e puoi continuare a modificare e salvare. Prova un’altra variante, un altro template o regola il ritaglio per migliorare la leggibilità. Un file mancante, illeggibile o completamente vuoto dopo la pulizia deve invece essere corretto prima di esportare.
+Il contrasto considera anche la trasparenza del marchio. Se è insufficiente trovi la segnalazione nell’ingranaggio, in **Grafica → Avvisi grafica**: puoi scegliere una variante chiara o scura oppure spostare il logo. Questi avvisi non verificano le scritte già incorporate nella Grafica AI. Un file mancante, illeggibile o vuoto dopo la pulizia deve essere corretto prima di esportare; gli errori che impediscono il salvataggio restano visibili nella schermata principale.
 
 ### Colori e font
 
@@ -50,19 +50,19 @@ I colori sono **quattro in totale**: primario, secondario, aggiuntivo 1 e aggiun
 
 Sono accettati anche tre numeri separati da spazi, come `rgb(255 128 0)`. I valori RGB devono essere interi tra **0 e 255**; non usare percentuali, nomi di colori o un quarto valore di trasparenza. Uscendo dal campo, un codice valido viene mostrato come HEX completo. La conversione conserva lo stesso colore: questo valore HEX viene salvato e passato all’AI. Un valore non valido impedisce il salvataggio e indica il campo da correggere.
 
-La palette viene passata all’AI. Quando applica i testi alla fotografia, l’app sceglie un colore leggibile della palette oppure bianco o nero. Se necessario schiarisce o scurisce il fondo sotto gli elementi, con bordi sfumati e mantenendo visibile la foto. Il contrasto non sostituisce il controllo visivo della composizione.
+La palette viene passata all’AI. Il testo automatico usa un colore leggibile direttamente sulla fotografia, senza fondini. Se il contrasto non basta, cambia colore o posizione. Controlla sempre visivamente la composizione.
 
-Puoi scegliere separatamente **Font dei titoli** e **Font dei testi**. Sono inclusi Bricolage Grotesque e DM Sans. Per il carattere aziendale carica un file WOFF2, WOFF, TTF o OTF fino a 5 MB, nella variante che vuoi usare. Attendi il completamento del caricamento prima di salvare.
+Puoi scegliere separatamente **Font dei titoli** e **Font dei testi**. Sono inclusi Bricolage Grotesque, DM Sans e Kaushan Script. Per il carattere aziendale carica un file WOFF2, WOFF, TTF o OTF fino a 5 MB, nella variante che vuoi usare. Attendi il completamento del caricamento prima di salvare.
 
 ### Template predefinito e salvataggio
 
-**Template predefinito per i nuovi post** stabilisce lo schema proposto inizialmente. Potrai modificarlo nello Studio o nella bozza editoriale.
+**Schema iniziale** stabilisce lo schema proposto inizialmente. Potrai modificarlo nello Studio o nella bozza editoriale.
 
 Premi **Salva dati azienda** per conservare tutte le impostazioni. I nuovi contenuti le recuperano automaticamente. Un post già salvato mantiene invece la propria copia di loghi, colori e font: per aggiornarla aprilo nello Studio, premi **Usa le impostazioni aziendali aggiornate**, controlla l’anteprima e salva il post.
 
 ## Pianificare prima dello shooting
 
-In **Libreria → Nuova bozza** puoi preparare un contenuto senza avere ancora le fotografie. È obbligatorio soltanto l’argomento.
+In **Libreria → Calendario → Annota un’idea** puoi conservare un argomento senza foto. Gli altri campi sono raccolti in **Aggiungi dettagli e date (facoltativo)**.
 
 | Campo | Cosa inserire |
 | --- | --- |
@@ -77,7 +77,7 @@ In **Libreria → Nuova bozza** puoi preparare un contenuto senza avere ancora l
 | Note | Vincoli, richieste e informazioni da rispettare. |
 | Template e formato | La disposizione e le proporzioni desiderate per il post. |
 
-Premi **Salva bozza**. Non vengono effettuate chiamate AI. La data dello shooting organizza la produzione delle fotografie; la pubblicazione prevista organizza il calendario dei contenuti. Nessuna delle due avvia un invio automatico al social. Puoi lasciare una bozza senza data e ritrovarla in **Da pianificare**.
+Premi **Salva bozza**. Non vengono effettuate chiamate AI. La data dello shooting organizza la produzione delle fotografie; la pubblicazione prevista organizza il calendario dei contenuti. Nessuna delle due avvia un invio automatico al social. Puoi lasciare una bozza senza data e ritrovarla in **Senza data**.
 
 Le date vengono mostrate nel fuso del dispositivo: controlla il fuso indicato nel modulo, soprattutto se lavori da dispositivi configurati diversamente.
 
@@ -86,10 +86,10 @@ Un esempio esclusivamente dimostrativo: argomento «Presentazione di un prodotto
 ## Generare dalla bozza
 
 1. Apri la bozza dalla Libreria e scegli **Genera dalla bozza**.
-2. Nello Studio controlla il riepilogo **Dalla bozza** e **Brief e scatti da preparare**.
-3. Carica la fotografia dopo lo shooting; controlla template, formato e modalità.
-4. Premi **Genera post dalla bozza** e rileggi il risultato.
-5. Premi **Salva post**.
+2. Il brief viene recuperato automaticamente; puoi rileggerlo nelle impostazioni, sezione **Post**.
+3. Carica la fotografia; le impostazioni sono già pronte.
+4. Premi **Genera** e rileggi il risultato.
+5. Premi **Salva in bozze**.
 
 L’app recupera automaticamente brief, template, formato e identità salvata. L’AI usa obiettivo, testo provvisorio e note come indicazioni, insieme alla fotografia. Gli scatti richiesti non vengono trattati come fatti già presenti nell’immagine: il risultato va comunque verificato.
 
@@ -97,7 +97,7 @@ Il salvataggio aggiorna **lo stesso contenuto**, mantenendo brief e data previst
 
 ## Cinque template sulla foto a tutto sfondo
 
-Il template propone la disposizione iniziale degli elementi sovrapposti alla fotografia. Puoi personalizzarla nello Studio. Posizioni, dimensioni e stili vengono salvati nel post e conservati anche durante la rigenerazione; le righe del testo possono adattarsi allo spazio disponibile.
+Il template propone la disposizione iniziale degli elementi sovrapposti alla fotografia. Durante la generazione l’AI può scegliere nuove posizioni e dimensioni per gli elementi automatici, in base alla foto. Le posizioni impostate a mano restano fisse. Lo stile può cambiare soltanto con **Stile testo automatico** attivo; le righe del testo si adattano allo spazio disponibile. Le impostazioni vengono salvate nel post.
 
 | Template | Posizione del logo | Zona prevista per il soggetto |
 | --- | --- | --- |
@@ -107,7 +107,7 @@ Il template propone la disposizione iniziale degli elementi sovrapposti alla fot
 | Testi in basso | In alto a destra | Nella parte superiore. |
 | Testi centrati | In basso al centro | Sopra il messaggio. |
 
-L’AI riceve le coordinate delle zone riservate a titolo, sottotitolo e logo e l’indicazione della zona per il soggetto. Deve lasciare uno sfondo fotografico continuo nelle aree di testo. L’app applica poi i testi con i font reali e il file del logo aziendale nelle posizioni del template.
+L’AI analizza la foto e propone i riquadri effettivi per titolo, testo di supporto e logo, anche in zone separate. Riceve i testi esatti, il ritaglio visibile e le posizioni fissate dall’utente. L’app controlla margini, sovrapposizioni e soggetti riconosciuti, poi applica font reali e logo aziendale mantenendoli modificabili e senza sfondi aggiunti. Se la proposta non è utilizzabile, cerca una disposizione alternativa negli spazi liberi individuati. Questa scelta usa la richiesta di analisi già prevista, senza ulteriori tentativi automatici a pagamento.
 
 La disposizione degli elementi è controllata dall’app; il rispetto delle indicazioni nella fotografia generata richiede una verifica visiva. Con una foto già scattata, scegli uno schema compatibile e regola il ritaglio: l’app non sposta automaticamente persone o oggetti all’interno dell’immagine.
 
@@ -128,40 +128,43 @@ Ogni template prevede posizioni e margini per tutti e quattro i formati. Cambiar
 
 ## Lavorare nello Studio
 
-Lo Studio mantiene l’anteprima nella schermata. L’ingranaggio in basso a destra apre un pannello scorrevole con tutte le configurazioni:
+Lo Studio mostra foto, descrizione e azioni principali. Dopo aver scelto la foto premi **Genera**: per i nuovi post è già attiva **Grafica AI**, che compone fotografia e scritte insieme. Il logo originale resta separato e spostabile; descrizione e hashtag restano modificabili. Per cambiare le scritte nella grafica, aggiorna **Cosa vuoi comunicare?** e premi **Rigenera**. Controlla il risultato, poi scegli **Pubblica** oppure **Salva in bozze**. L’ingranaggio in basso a destra apre soltanto le personalizzazioni facoltative:
 
-- **Grafica**: scegli titolo, testo di supporto o logo; modifica posizione e dimensione. Per le scritte scegli font, spessore, colore e allineamento. Puoi caricare un font personalizzato. Le sezioni espandibili contengono formato, schemi iniziali, loghi e palette del post.
-- **Foto**: regola ritaglio, filtri e ritocco.
-- **Testi e AI**: modifica caption e hashtag, scegli modalità, social e tono, e avvia la generazione.
-- **Post**: imposta nome e stato nella Libreria e consulta il brief della bozza.
+- **Grafica**: modifica posizione e dimensione del logo. Nelle modalità con testi modificabili puoi scegliere anche titolo e testo di supporto, font, spessore, colore e allineamento. Le sezioni espandibili contengono formato, loghi e palette; gli schemi iniziali sono disponibili per le scritte modificabili. Cambiare formato a una Grafica AI richiede **Rigenera** per adattare le scritte.
+- **Foto**: regola filtri e ritocco. Il ritaglio manuale è disponibile quando le scritte sono modificabili; Grafica AI mantiene l’inquadratura completa.
+- **Testi e AI**: cambia modalità, social e tono; nelle modalità con scritte modificabili puoi correggere titolo e sottotitolo sulla foto.
+- **Post**: imposta il nome nella Libreria e consulta il brief della bozza.
 
 Chiudi il pannello per tornare alla foto. Tocca o clicca un elemento per selezionarlo, trascinalo per spostarlo e usa la maniglia per ingrandirlo o ridurlo. Con la tastiera, le frecce spostano l’elemento selezionato; più e meno ne cambiano la dimensione. I controlli numerici nel pannello offrono le stesse regolazioni.
 
-Le modifiche valgono per il post aperto e non cambiano il Profilo o gli altri post. Il colore manuale viene conservato; se poco leggibile compare un avviso. **Scegli automaticamente un colore leggibile** riattiva la scelta automatica. Quando lo spazio non basta, il testo viene adattato e l’anteprima segnala di ingrandire il riquadro o accorciare la scritta. Premi **Salva post** nella barra superiore per conservare il risultato.
+Le modifiche valgono per il post aperto. Le segnalazioni sul contrasto e sulle scritte modificabili si trovano nell’ingranaggio, in **Grafica → Avvisi grafica**, quando presenti; non viene aggiunto uno sfondo per correggerle. **Scegli automaticamente un colore leggibile** riattiva la scelta del colore. Quando lo spazio non basta, ingrandisci il riquadro o accorcia il testo. **Salva in bozze** conserva il risultato.
 
 Puoi partire direttamente da **Nuovo post** quando hai già la foto. **Scegli foto** carica dal dispositivo; **Scatta foto** apre la fotocamera. Prima del caricamento puoi controllare lo scatto, rifarlo o confermare con **Usa foto**.
 
 ### Modalità e richieste AI
 
-In **Testi e AI**, l’opzione **Stile testo automatico** consente all’AI di scegliere font, peso, dimensioni, colori e allineamento di titolo e sottotitolo in base alla foto e al brand. È disattivata inizialmente. Se la attivi, il successivo **Genera** può sostituire anche lo stile personalizzato; disattivala per conservarlo. Le posizioni manuali restano fisse. L’opzione è salvata nel post e nella bozza del dispositivo.
+**Grafica AI** crea le scritte direttamente nell’immagine, scegliendo stile e disposizione insieme alla fotografia. Non aggiunge un secondo titolo nell’editor. Il logo originale viene posizionato separatamente, senza ridisegnarlo. Le istruzioni vietano fondini, fasce e pennellate; controlla comunque l’anteprima, perché il modello può commettere errori. Le scritte integrate non sono trascinabili: cambiarle richiede una nuova generazione.
 
-L’AI può differenziare una parola dal resto del titolo, anche con un carattere calligrafico più grande, e scegliere una pennellata dietro al testo. La scelta dipende dalla foto e dal messaggio: non tutti i post richiedono il corsivo o uno sfondo dipinto. In **Grafica → Composizione del testo** puoi modificare **Parola in evidenza**, font, colore, dimensione relativa e riga dedicata. La parola deve comparire nel titolo; se cambi il testo, aggiorna anche quella da evidenziare. In **Sfondo della scritta** scegli contrasto automatico, nessuno o pennellata; per la pennellata puoi regolare colore e intensità. Lo sfondo segue il riquadro e rimane dentro l’area riservata.
+Se preferisci scritte modificabili, scegli **Foto creativa**, **Ritocco** oppure **Originale** in **Testi e AI**, poi premi **Genera** o **Rigenera**. In queste modalità, **Stile testo automatico** consente all’AI di scegliere font, peso, dimensioni, colori e allineamento in base alla foto. Disattivala per conservare lo stile personalizzato. Le posizioni manuali restano fisse. I post già salvati mantengono la propria scelta. Le regolazioni descritte di seguito riguardano queste tre modalità.
 
-Il font calligrafico **Kaushan Script** è incluso nell’app con la sua licenza e funziona anche senza scaricare font da Internet. Titolo, parola in evidenza e pennellata restano modificabili separatamente nello Studio; l’esportazione li unisce nell’immagine finale.
+L’AI può valorizzare una parola con un carattere calligrafico più grande, quando adatto al messaggio. Testo e logo restano direttamente sulla foto, senza fondini. In **Grafica → Composizione del testo** puoi modificare **Parola in evidenza**, font, colore, dimensione relativa e riga dedicata. La parola deve comparire nel titolo.
 
-I caratteri possono essere quelli inclusi nell’app o quelli già caricati nel brand del post. L’AI non può aggiungere font da Internet. Original sceglie lo stile insieme ai testi; Enhance e Creative lo scelgono durante l’analisi della fotografia finale. Questa opzione non aggiunge altre richieste al flusso, ma aumenta il contenuto della risposta. Tutti gli elementi restano modificabili prima di salvare.
+Il font calligrafico **Kaushan Script** è incluso nell’app con la sua licenza e funziona senza scaricare font da Internet. Titolo e parola in evidenza restano modificabili nello Studio; l’esportazione li unisce nell’immagine finale.
 
-| Modalità | Cosa fa nei nuovi template | Richieste per una generazione riuscita |
+I caratteri possono essere quelli inclusi nell’app o quelli già caricati nel brand del post. L’AI non può aggiungere font da Internet. Originale sceglie lo stile insieme ai testi; Ritocco e Creativa lo scelgono durante l’analisi della fotografia finale. Questa opzione non aggiunge altre richieste al flusso, ma aumenta il contenuto della risposta. Tutti gli elementi restano modificabili prima di salvare.
+
+| Modalità | Cosa fa | Richieste per una generazione riuscita |
 | --- | --- | --- |
-| Original | Mantiene la fotografia, prepara i testi e cerca spazio libero per le scritte. | Una richiesta per testi e analisi della foto. |
-| Enhance | Prepara i testi, ritocca la fotografia e ne controlla la composizione. | Una richiesta per i testi, una per l’immagine e una per controllarla. |
-| Creative | Prepara i testi e ricompone l’ambientazione lasciando spazio al messaggio. | Una richiesta per i testi, una per l’immagine e una per controllarla. |
+| Grafica AI | Compone fotografia e scritte insieme; mantiene il logo originale separato. | Una richiesta per i testi, una per la grafica e, se è presente un logo, una per posizionarlo. |
+| Originale | Mantiene la fotografia, prepara i testi e cerca spazio libero per le scritte. | Una richiesta per testi e analisi della foto. |
+| Ritocco | Prepara i testi, ritocca la fotografia e ne controlla la composizione. | Una richiesta per i testi, una per l’immagine e una per controllarla. |
+| Foto creativa | Prepara i testi e ricompone l’ambientazione lasciando spazio al messaggio. | Una richiesta per i testi, una per l’immagine e una per controllarla. |
 
-Le scritte restano modificabili e vengono posizionate sullo sfondo libero, insieme al logo, cercando di evitare persone, prodotti e dettagli importanti. L’app considera il ritaglio del formato scelto e avvisa quando adatta la composizione. Se hai già spostato un elemento, la tua posizione resta fissa anche quando copre un soggetto: questa scelta manuale non blocca la generazione. Gli elementi automatici continuano a cercare spazio libero, evitando anche i riquadri scelti manualmente e lo sfondo ampliato del logo. Puoi ripristinare la posizione dal pannello Grafica per consentire una nuova disposizione automatica.
+In Foto creativa, Ritocco e Originale le scritte restano modificabili e vengono posizionate sullo sfondo libero, insieme al logo, cercando di evitare persone, prodotti e dettagli importanti. L’app considera il ritaglio del formato scelto e avvisa quando adatta la composizione. Se hai già spostato un elemento, la tua posizione resta fissa anche quando copre un soggetto: questa scelta manuale non blocca la generazione. Gli elementi automatici continuano a cercare spazio libero, evitando anche i riquadri scelti manualmente; non viene riservato spazio per fondini. Puoi ripristinare la posizione dal pannello Grafica per consentire una nuova disposizione automatica.
 
 Quando non trova spazio sufficiente per gli elementi ancora automatici, l’app interrompe la generazione: scegli una foto con più respiro o rivedi i riquadri. Se tutte le posizioni sono manuali, la loro sovrapposizione non viene bloccata dall’analisi AI. Il riconoscimento AI può sbagliare: verifica sempre l’anteprima e ricontrollala dopo aver spostato elementi o cambiato ritaglio e formato. I post con i template precedenti mantengono il comportamento originale.
 
-Scegli il social, il tono e compila **Cosa vuoi comunicare?** con indicazioni reali. Questi dati vengono usati quando premi Genera. Il testo provvisorio della bozza guida la scrittura ma non è una promessa di riproduzione parola per parola: i campi del risultato restano modificabili.
+Dopo aver caricato o scattato la foto, nella schermata principale compare **Cosa vuoi comunicare?**, prima di **Genera**: scrivi un’offerta, una novità o il messaggio da includere, per esempio «oggi caffè a 1 euro». Il campo è facoltativo e resta salvato con la bozza. L’AI riceve queste indicazioni per il titolo, la descrizione e la grafica; controlla sempre prezzi e dettagli prima di pubblicare. Se lasci vuoto, il post nasce dalla foto e dai dati aziendali. Social e tono sono già impostati: puoi cambiarli in **Testi e AI** nella rotellina. Il testo provvisorio di una bozza pianificata continua a guidare la scrittura.
 
 Premere Genera o rigenerare può comportare consumi sul servizio AI dell’azienda. Cambiare manualmente testi, filtri, formato, template, ritaglio o variante del logo non avvia nuove chiamate AI. Il piano gratuito ha un limite applicativo di due generazioni; Pro lo rimuove, ma non elimina i costi del fornitore.
 
@@ -177,23 +180,23 @@ I filtri rapidi applicano una combinazione di regolazioni. Per modificare una ba
 | --- | --- |
 | Titolo grafica | Il messaggio principale disegnato sulla foto. |
 | Testo di supporto nella grafica | Un testo breve sulla foto; è facoltativo. |
-| Caption | Il testo che accompagna la pubblicazione. |
-| Hashtag | Gli hashtag del post. |
+| Descrizione del post | Il testo che accompagna la pubblicazione, modificabile nella schermata principale. |
+| Hashtag | Sono inclusi nella descrizione del post. |
 | Titolo nella Libreria | Il nome interno per riconoscere il contenuto. |
 
-Titolo e testo di supporto vengono misurati con i font scelti e adattati allo spazio. Se il testo è troppo lungo per rimanere leggibile, lo Studio segnala il problema e impedisce l’esportazione: accorcialo o cambia template. Sposta nella caption i dettagli che non servono nella grafica.
+Nelle modalità con scritte modificabili, titolo e testo di supporto vengono misurati con i font scelti e adattati allo spazio. Se il testo è troppo lungo per rimanere leggibile, lo Studio segnala il problema e impedisce l’esportazione: accorcialo o cambia template. Sposta nella caption i dettagli che non servono nella grafica.
 
-**Copia tutto** copia caption e hashtag. **Bozza** indica un contenuto ancora in lavorazione; **Pronto per la pubblicazione** indica che lo hai preparato. Lo stato non invia automaticamente il post a un social.
+**Descrizione del post**, nella schermata principale, contiene testo e hashtag. Puoi modificarli direttamente. In Libreria, **Altre azioni → Copia testo** li copia negli appunti. Salvare una bozza non pubblica nulla.
 
 ### Salvare e riprendere
 
-**Salva post**, nella barra superiore, conserva immagine finale, testi, filtri, template, formato e identità aziendale. I nuovi template vengono esportati in PNG con le dimensioni indicate sopra. Anteprima ed esportazione usano la stessa composizione.
+**Salva in bozze** conserva immagine finale, testi, filtri, formato e identità aziendale e apre la vista Bozze. **Pubblica** salva prima la bozza e apre la conferma dell’account: chiudendo la finestra il lavoro resta conservato. Anteprima ed esportazione usano la stessa composizione e producono un PNG.
 
 Nel browser la bozza aperta resta disponibile quando cambi sezione, ma devi salvarla prima di ricaricare o chiudere la pagina. Nell’app mobile la bozza viene conservata sul dispositivo per account e backend; per vederla nella Libreria o da un altro dispositivo occorre comunque salvare. Foto e dati remoti richiedono il collegamento al backend: non è una modalità offline.
 
 ## Modificare un post esistente
 
-Apri il post dalla Libreria e scegli **Modifica**. Cambia ciò che serve e premi **Salva post**. Template, versione e identità del contenuto sono conservati: cambiare il Profilo non modifica automaticamente i post precedenti.
+Apri il post dalla Libreria e scegli **Modifica**. Cambia ciò che serve e premi **Salva in bozze**. Template, versione e identità del contenuto sono conservati: cambiare il Profilo non modifica automaticamente i post precedenti.
 
 I primi template con foto e testo in aree distinte restano utilizzabili per riaprire i contenuti salvati con quella versione. Per applicare la nuova disposizione scegli uno dei cinque schemi nello Studio e salva.
 
@@ -203,11 +206,11 @@ Un post già pubblicato è in sola lettura. Per modificare un contenuto in coda 
 
 ## Libreria, date e pubblicazione
 
-**Agenda** elenca i contenuti per giorno ed è la vista iniziale sul telefono. **Calendario** permette di scegliere un mese e un giorno. **Tutti i post**, **Bozze editoriali** e **Da pianificare** aiutano a distinguere i contenuti salvati, quelli ancora in preparazione e quelli senza data. Sul telefono usa **Visualizza**.
+**Tutti i post** è la vista iniziale. **Bozze** raccoglie i contenuti ancora modificabili, comprese le idee senza foto; **Pubblicati** quelli già pubblicati. **Calendario** permette di organizzare date e idee. Da lì puoi scegliere anche **Agenda** o **Senza data**. Sul telefono usa **Visualizza**.
 
 La ricerca considera titolo, testi, note e brief. I filtri restringono i risultati per piattaforma e stato. **Azzera filtri** torna alla visualizzazione completa; **Aggiorna** rilegge i dati dal backend.
 
-**Pianifica** o **Modifica data** imposta data editoriale e note. Dal menu **Altre azioni** puoi, quando il contenuto lo consente:
+Nel menu **Altre azioni**, **Pianifica** o **Modifica data prevista** imposta un promemoria. Nello stesso menu puoi, quando il contenuto lo consente:
 
 - Scaricare foto e testo in un unico ZIP.
 - Copiare caption e hashtag.
@@ -216,7 +219,7 @@ La ricerca considera titolo, testi, note e brief. I filtri restringono i risulta
 - Segnare una pubblicazione già effettuata manualmente.
 - Eliminare il contenuto dopo conferma.
 
-**Segna come pubblicato** registra un’azione già eseguita: non pubblica al tuo posto. Per inviare una foto usa il pulsante **Pubblica foto** nella scheda del post. Serve Pro, il social attivato dal gestore e un account autorizzato.
+**Segna come pubblicato** registra un’azione già eseguita: non pubblica al tuo posto. Per inviare una foto usa il pulsante **Pubblica** nella scheda del post. Serve Pro, il social attivato dal gestore e un account autorizzato.
 
 La finestra mostra la foto salvata nello Studio. Se l’anteprima non si carica, l’invio resta bloccato: chiudi e riapri la finestra per riprovare. Scegli l’account di destinazione e controlla il testo con gli hashtag: puoi modificarlo per questo invio senza riscrivere il testo originale nello Studio. Il contatore segnala quanto accorciare un testo troppo lungo. Il social resta quello scelto nel post; un invio riguarda un solo social.
 

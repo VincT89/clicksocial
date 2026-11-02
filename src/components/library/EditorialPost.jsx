@@ -30,11 +30,11 @@ export default function EditorialPost({ post, compact = false, onPlan, onSchedul
     <div data-tour="library-actions" className="mt-auto pt-4">
       <div className="flex items-center gap-1">
         <Button variant={planningOnly ? 'default' : 'outline'} size="sm" className="h-11 min-w-min whitespace-normal px-1.5 leading-4" asChild><Link to={'/studio?id=' + post.id}>{locked ? 'Visualizza' : planningOnly ? 'Genera dalla bozza' : 'Modifica'}</Link></Button>
-        {!locked && <Button variant={date ? 'outline' : 'default'} size="sm" className="h-11 min-w-min whitespace-normal px-1.5 leading-4" onClick={() => onPlan(post)}>{date ? 'Modifica data' : 'Pianifica'}</Button>}
-        {!planningOnly && !locked && <Button size="sm" className="h-11 min-w-min whitespace-normal px-1.5 leading-4" onClick={() => onSchedule(post)}>Pubblica foto</Button>}
+        {!planningOnly && !locked && <Button size="sm" className="h-11 min-w-min whitespace-normal px-3 leading-4" onClick={() => onSchedule(post)}>Pubblica</Button>}
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="ml-auto h-11 w-11 shrink-0" aria-label={'Altre azioni per ' + (post.title || 'Senza titolo')}><MoreHorizontal size={18} /></Button></DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64 max-w-[calc(100vw-2rem)]">
+            {!locked && <DropdownMenuItem className="min-h-11" onSelect={() => onPlan(post)}>{date ? 'Modifica data prevista' : 'Pianifica'}</DropdownMenuItem>}
             {!planningOnly && <DropdownMenuItem className="min-h-11" onSelect={() => downloadPost(post.id).catch(error => toast.error('Download non riuscito: ' + error.message))}>Scarica foto e testo (ZIP)</DropdownMenuItem>}
             <DropdownMenuItem className="min-h-11" disabled={!post.caption && !post.hashtags} onSelect={() => onCopy(post)}>Copia testo</DropdownMenuItem>
             {!planningOnly && post.status === 'in_coda' && <DropdownMenuItem className="min-h-11" onSelect={() => onSchedule(post)}>Modifica invio automatico</DropdownMenuItem>}

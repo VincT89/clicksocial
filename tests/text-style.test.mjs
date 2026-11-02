@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { applyTextStyle, textStyleSchema } from '../server/textStyle.mjs';
-import { defaultDesign, normalizeDesign, designLayout } from '../shared/templates.mjs';
+import { defaultDesign, newPostDesign, normalizeDesign, designLayout } from '../shared/templates.mjs';
 import { restoreStudioDraft } from '../src/lib/studioDraft.mjs';
 import { createApp } from '../server/app.mjs';
 import { createIntegrations } from '../server/integrations.mjs';
@@ -12,9 +12,21 @@ import { saveImage } from '../server/files.mjs';
 import { emphasisParts, fitStyledText, normalizeEmphasis } from '../shared/textTypography.mjs';
 
 const style = {
-  heading: { font: 'DM Sans', weight: 800, font_size: 88, color: '#263b30', align: 'left', emphasis: { text: 'passo', font: 'Kaushan Script', weight: 400, scale: 1.6, color: '#26462F', separate_line: true }, backdrop: { style: 'brush', color: '#FFF2DC', opacity: .9 } },
+  heading: { font: 'DM Sans', weight: 800, font_size: 88, color: '#263b30', align: 'left', emphasis: { text: 'passo', font: 'Kaushan Script', weight: 400, scale: 1.6, color: '#26462F', separate_line: true }, backdrop: { style: 'none', color: '#FFF2DC', opacity: 0 } },
   subtitle: { font: 'Bricolage Grotesque', weight: 500, font_size: 32, color: '#334433', align: 'left', backdrop: { style: 'none', color: '#FFFFFF', opacity: 0 } },
 };
+
+test('nuova bozza: stile automatico e sfondi trasparenti, senza cambiare le bozze precedenti', () => {
+  const design = newPostDesign({ preferred_template: 'basso' });
+  assert.equal(design.ai_text_style, true); assert.equal(design.transparent_overlays, true); assert.equal(design.template_id, 'basso');
+  const stored = { ...design, ai_text_style: false, elements: { heading: { color: '#123456' } } };
+  const restored = restoreStudioDraft(JSON.stringify({ version: 1, originalUrl: '/api/files/' + uid(), tone: 'ispirazionale', mode: 'creative', design: stored }), {});
+  assert.deepEqual(restored.design, stored); assert.equal(restored.tone, 'ispirazionale'); assert.equal(restored.mode, 'creative');
+  assert.equal(restoreStudioDraft(JSON.stringify({ version: 1, originalUrl: '/api/files/' + uid(), tone: null, design }), {}).tone, null);
+  const legacy = normalizeDesign({ ...defaultDesign(), elements: { logo: { backdrop_opacity: .8 } } });
+  assert.equal(legacy.transparent_overlays, undefined); assert.equal(legacy.ai_text_style, undefined);
+  assert.throws(() => normalizeDesign({ ...design, transparent_overlays: 'true' }));
+});
 
 test('stile AI: opzione esplicita, posizioni e logo conservati, bozza ripristinabile', () => {
   const design = defaultDesign();
@@ -31,7 +43,9 @@ test('stile AI: opzione esplicita, posizioni e logo conservati, bozza ripristina
   assert.deepEqual(changed.brand.fonts.heading, { family: 'DM Sans', weight: 800, url: '' });
   assert.deepEqual(changed.brand.colors, design.brand.colors);
   assert.equal(changed.elements.heading.emphasis.font, 'Kaushan Script');
-  assert.equal(changed.elements.heading.backdrop.style, 'brush');
+  assert.equal(changed.elements.heading.backdrop.style, 'none');
+  assert.equal(changed.transparent_overlays, true);
+  assert.throws(() => applyTextStyle({ ...design, ai_text_style: true }, { ...style, heading: { ...style.heading, backdrop: { style: 'brush', color: '#FFFFFF', opacity: .5 } } }), error => error.status === 502);
   assert.deepEqual(restoreStudioDraft(JSON.stringify({ version: 1, originalUrl: '/api/files/' + uid(), design: changed }), {}).design, changed);
   assert.equal(applyTextStyle({ ...changed, ai_text_style: false }, { ...style, heading: { ...style.heading, color: '#FFFFFF' } }).elements.heading.color, '#263B30');
   for (const value of ['true', 1, null, {}]) assert.throws(() => normalizeDesign({ ...design, ai_text_style: value }));
@@ -94,7 +108,8 @@ test('generazione simulata: stile nella richiesta esistente, sulla foto finale p
   const design = { ...defaultDesign(), ai_text_style: true };
   for (const mode of ['original', 'enhance', 'creative']) {
     calls.length = 0;
-    const generated = await ai.generateCopy(user, { file_url: image.file_url, design, mode });
+    const generated = await ai.generateCopy(user, { file_url: image.file_url, design, mode, tone: 'ispirazionale' });
+    assert.match(calls.find(call => call.kind === 'social_copy').prompt, /tono ispirazionale/);
     assert.equal(calls.length, mode === 'original' ? 1 : 3);
     const styleCall = calls.find(call => call.schema?.properties.text_style);
     assert.equal(styleCall.kind, mode === 'original' ? 'social_copy' : 'photo_composition');
@@ -107,7 +122,7 @@ test('generazione simulata: stile nella richiesta esistente, sulla foto finale p
   calls.length = 0;
   const off = { ...design, ai_text_style: false, elements: { heading: { color: '#C02030' } } };
   const unchanged = await ai.generateCopy(user, { file_url: image.file_url, design: off, mode: 'original' });
-  assert.deepEqual(unchanged.design, off);
+  assert.deepEqual(unchanged.design, { ...off, transparent_overlays: true });
   assert.ok(calls.every(call => !call.schema?.properties.text_style));
   returnedStyle = { ...style, heading: { ...style.heading, font: 'https://example.test/unsafe-font' } };
   await assert.rejects(() => ai.generateCopy(user, { file_url: image.file_url, design, mode: 'original' }), /stile del testo/);

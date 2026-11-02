@@ -190,9 +190,11 @@ test('pianificazione e branding: persistenza, proprietà, generazione collegata 
   assert.match(imagePrompt,/SOLO la parte fotografica/); assert.match(imagePrompt,/#123456/);
   assert.match(imagePrompt,/Non aggiungere titoli/); assert.equal(calls[1].body.get('model'),'gpt-image-2');
   assert.match(imagePrompt,/reserved_areas/); assert.match(imagePrompt,/subject_area/);
-  assert.match(imagePrompt,/Testi a destra, logo in basso a sinistra/);
+  assert.match(imagePrompt,/"template":"Testi a destra"/);
+  assert.match(imagePrompt,/"automatic_areas_are_suggestions":true/);
+  assert.match(imagePrompt,/Soltanto le manual_areas sono vincolanti/);
   assert.match(imagePrompt,/sfondo fotografico continuo/);
-  assert.match(imagePrompt,/Non collocarvi volti, prodotti/);
+  assert.match(imagePrompt,/non collocare volti, prodotti o scritte reali negli spazi scelti per il testo/i);
   assert.match(copyRequest.input[0].content[0].text,/reserved_areas/);
   const saved = await request('/entities/Post/'+id,{image_url:photo,original_image_url:photo,graphic_url:generated.data.graphic_url,headline:generated.data.headline,graphic_subtitle:generated.data.graphic_subtitle,design:generated.data.design,status:'pronto'},'PATCH');
   assert.equal(saved.status,200); assert.equal(saved.data.id,id); assert.equal(saved.data.planning.topic,'Bozza senza fotografia');

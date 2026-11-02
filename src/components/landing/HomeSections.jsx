@@ -5,20 +5,20 @@ import { Camera, Compass, Send, ShieldCheck } from "lucide-react";
 const FLOW = [
   {
     tag: "Foto",
-    title: "Carica e ritocca",
-    text: "Filtri, luce e atmosfera nello stesso riquadro.",
+    title: "Carica o scatta una foto",
+    text: "Scegli una foto dal telefono oppure usa la fotocamera.",
     icon: Camera,
   },
   {
     tag: "Direzione",
-    title: "Scegli voce, social e modalità",
-    text: "Scrivi il testo oppure usa l'AI, quando configurata, per generare caption e hashtag.",
+    title: "Premi Genera",
+    text: "L’AI prepara grafica creativa, scritte, descrizione e hashtag. Le impostazioni sono già pronte e puoi personalizzarle quando vuoi.",
     icon: Compass,
   },
   {
     tag: "Output",
-    title: "Pubblica dove vuoi",
-    text: "Scarica foto e testo. Con Pro puoi inviare o programmare le foto sui social collegati e attivati dal gestore.",
+    title: "Pubblica o salva in bozze",
+    text: "Controlla il risultato e conservalo. Con Pro puoi pubblicarlo sui social collegati e attivati dal gestore; puoi anche scaricare foto e testo.",
     icon: Send,
   },
 ];

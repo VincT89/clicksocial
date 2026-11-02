@@ -158,7 +158,7 @@ async function selectOverlayLogo(design, template, ctx, area) {
     const sampleCtx = sample.getContext('2d'); sampleCtx.drawImage(canvas, 0, 0, 64, 64);
     const size = design.elements?.logo?.backdrop_size || 1;
     const backdrop = { box: logoBackdropBox(position, size), feather: Math.min(ctx.canvas.width, ctx.canvas.height) * .01 * size };
-    const treatment = logoTreatment(photoSamples(ctx, position, sampleCtx.getImageData(0, 0, 64, 64).data, backdrop), design.elements?.logo?.backdrop_opacity);
+    const treatment = logoTreatment(photoSamples(ctx, position, sampleCtx.getImageData(0, 0, 64, 64).data, backdrop), design.transparent_overlays ? 0 : design.elements?.logo?.backdrop_opacity);
     return { variant, canvas, position, treatment };
   }));
   const usable = loaded.filter(item => item.treatment.sufficient);
@@ -186,22 +186,25 @@ export async function checkGeneratedTemplate(url, design, filters, headline, sub
 export async function renderTemplate(canvas, source, input, filters, headline = '', subtitle = '', options = {}) {
   headline = String(headline || ''); subtitle = String(subtitle || '');
   const design = normalizeDesign(input), template = getTemplate(design.template_id, design.template_version);
+  const embedded = design.text_mode === 'image';
+  if (embedded && design.graphic_format && design.format !== design.graphic_format) throw new Error('Premi Rigenera per creare la grafica nel nuovo formato senza tagliare le scritte.');
+  if (embedded) { headline = ''; subtitle = ''; }
   const { width: w, height: h } = FORMATS[design.format], layout = designLayout(design);
   const elementLayout = {};
-  const logoBackdrop = design.elements?.logo || {};
-  const useOverlayLogo = template.overlay || logoBackdrop.backdrop_opacity !== undefined || logoBackdrop.backdrop_size !== undefined;
+  const logoBackdrop = design.transparent_overlays ? { ...design.elements?.logo, backdrop_opacity: 0 } : design.elements?.logo || {};
+  const useOverlayLogo = embedded || template.overlay || logoBackdrop.backdrop_opacity !== undefined || logoBackdrop.backdrop_size !== undefined;
   const background = design.brand.colors[template.background];
   const emphasis = design.elements?.heading?.emphasis;
   const accentFont = emphasis ? emphasisFont(design, emphasis) : null;
-  const [headingFamily, bodyFamily, legacyLogo, accentFamily] = await Promise.all([ensureFont(design.brand.fonts.heading), ensureFont(design.brand.fonts.body), useOverlayLogo ? null : selectLogo(design, background), accentFont ? ensureFont(accentFont) : null]);
+  const [headingFamily, bodyFamily, legacyLogo, accentFamily] = await Promise.all([embedded ? null : ensureFont(design.brand.fonts.heading), embedded ? null : ensureFont(design.brand.fonts.body), useOverlayLogo ? null : selectLogo(design, background), !embedded && accentFont ? ensureFont(accentFont) : null]);
   canvas.width = w; canvas.height = h; const ctx = canvas.getContext('2d');
   ctx.fillStyle = background; ctx.fillRect(0, 0, w, h);
   const rect = value => ({ x: value.x * w, y: value.y * h, width: value.width * w, height: value.height * h });
-  const photo = rect(layout.photo), crop = cropSource(source.naturalWidth, source.naturalHeight, photo.width, photo.height, design.crop);
+  const photo = rect(layout.photo), crop = cropSource(source.naturalWidth, source.naturalHeight, photo.width, photo.height, embedded ? { x: .5, y: .5 } : design.crop);
   const filtered = await preparedPhoto(source, photo.width, photo.height, crop, filters);
   ctx.drawImage(filtered, photo.x, photo.y, photo.width, photo.height);
   let autoColor = readableColor(design.brand.colors[template.foreground], background);
-  if (template.overlay && (headline.trim() || subtitle.trim())) {
+  if (template.overlay && !design.transparent_overlays && (headline.trim() || subtitle.trim())) {
     const areas = [['heading', headline], ['subtitle', subtitle]].filter(([role, text]) => {
       const item = design.elements?.[role];
       return text.trim() && !item?.emphasis && (!item?.backdrop || item.backdrop.style === 'auto') && (!item?.color || item.color === 'auto');
@@ -215,12 +218,17 @@ export async function renderTemplate(canvas, source, input, filters, headline = 
   }
   const drawText = (text, role, font, family, heading) => {
     const area = layout[role], custom = design.elements?.[role] || {};
-    const outer = rect(area), backdropMode = custom.backdrop?.style || 'auto';
+    const outer = rect(area), backdropMode = design.transparent_overlays ? 'none' : custom.backdrop?.style || 'auto';
     const box = backdropMode === 'brush' ? brushTextBox(outer) : outer;
     if (text.trim() && backdropMode === 'brush') drawTextBrush(ctx, outer, custom.backdrop);
     const rich = heading && emphasis && emphasisParts(text, emphasis).some(part => part.emphasis);
     const explicitColor = custom.color && custom.color !== 'auto';
-    const color = explicitColor ? custom.color : (rich || backdropMode !== 'auto') ? textTreatment(photoSamples(ctx, box), design.brand.colors).color : autoColor;
+    const directColor = () => {
+      const samples = photoSamples(ctx, box);
+      const choices = [...new Set([...design.brand.colors, '#FFFFFF', '#000000'])].map(color => ({ color, score: overlayScore(samples.map(paper => ({ paper, ink: rgb(color) }))) }));
+      return (choices.find(choice => choice.score >= 4.5) || choices.sort((a, b) => b.score - a.score)[0]).color;
+    };
+    const color = explicitColor ? custom.color : backdropMode === 'none' ? directColor() : (rich || backdropMode !== 'auto') ? textTreatment(photoSamples(ctx, box), design.brand.colors).color : autoColor;
     const accentColor = emphasis?.color && emphasis.color !== 'auto' ? emphasis.color : color;
     const measure = (line, size) => {
       ctx.font = `${font.weight} ${size}px "${family}"`;
@@ -234,18 +242,19 @@ export async function renderTemplate(canvas, source, input, filters, headline = 
     const lineHeight = Math.max(heading ? 1.12 : 1.2, ascent + descent + .06);
     const base = template.overlay ? Math.min(w, h) : w;
     const maximum = custom.font_size || base * (heading ? .085 : .035);
+    const minimum = design.ai_text_style && custom.placement === 'auto' ? Math.min(maximum, base * (heading ? .042 : .028)) : (custom.font_size || rich) ? 12 : base * (heading ? .042 : .028);
     const fitted = rich ? fitStyledText(text, emphasis, box, (line, size, accented) => {
       ctx.font = `${accented ? accentFont.weight : font.weight} ${size}px "${accented ? accentFamily : family}"`;
       const m = ctx.measureText(line), left = Math.max(0, m.actualBoundingBoxLeft);
       return { width: left + Math.max(m.width, m.actualBoundingBoxRight), left, ascent: Math.max(0, m.actualBoundingBoxAscent), descent: Math.max(0, m.actualBoundingBoxDescent) };
-    }, { min: 12, max: maximum }) : fitTextBox(text, box, measure, { min: custom.font_size ? 12 : base * (heading ? .042 : .028), max: maximum, maxLines: custom.font_size ? 30 : heading ? 5 : 4, lineHeight });
+    }, { min: minimum, max: maximum }) : fitTextBox(text, box, measure, { min: minimum, max: maximum, maxLines: custom.font_size ? 30 : heading ? 5 : 4, lineHeight });
     if (custom.font_size && fitted.size < custom.font_size - 1) options.onWarning?.('Il testo è stato adattato allo spazio disponibile. Ingrandisci il riquadro o accorcia la scritta per usare tutta la dimensione scelta.');
     if (text.trim() && (explicitColor || rich || backdropMode !== 'auto')) {
       const colors = rich ? [color, accentColor] : [color];
       const pairs = photoSamples(ctx, box).flatMap(paper => colors.map(ink => ({ paper, ink: rgb(ink) })));
       const treatment = backdropMode === 'auto' ? backdropFor(pairs) : null;
       if (treatment) shadeRegion(ctx, box, treatment, Math.min(w, h) * .01);
-      else if (overlayScore(pairs) < 4.5) options.onWarning?.('Il colore scelto per ' + (heading ? 'il titolo' : 'il testo di supporto') + ' ha poco contrasto. Prova un altro colore, aumenta lo sfondo o sposta la scritta.');
+      else if (overlayScore(pairs) < 4.5) options.onWarning?.('Il colore scelto per ' + (heading ? 'il titolo' : 'il testo di supporto') + ' ha poco contrasto. Prova un altro colore o sposta la scritta in una zona più uniforme.');
     }
     if (heading && emphasis?.text && !rich) options.onWarning?.('La parola da evidenziare non è più nel titolo. Aggiornala in Grafica oppure disattiva l’enfasi.');
     if (rich) {
@@ -276,8 +285,10 @@ export async function renderTemplate(canvas, source, input, filters, headline = 
     });
     elementLayout[role] = { box: area, fontSize: fitted.size, color, align: custom.align || template.textAlign, visible: !!text.trim() };
   };
-  drawText(headline, 'heading', design.brand.fonts.heading, headingFamily, true);
-  drawText(subtitle, 'subtitle', design.brand.fonts.body, bodyFamily, false);
+  if (!embedded) {
+    drawText(headline, 'heading', design.brand.fonts.heading, headingFamily, true);
+    drawText(subtitle, 'subtitle', design.brand.fonts.body, bodyFamily, false);
+  }
   const logoStyle = Number.isFinite(design.elements?.logo?.x) ? { ...template, logoAlign: 'left', logoVertical: 'top' } : template;
   const selected = useOverlayLogo ? await selectOverlayLogo(design, logoStyle, ctx, rect(layout.logo)) : null;
   const logo = selected?.canvas || legacyLogo?.canvas;
