@@ -98,7 +98,7 @@ workflows:
       - name: Compila il pacchetto per iPhone
         script: |
           set -euo pipefail
-          IOS_BUILD_NUMBER=$((10#$BUILD_NUMBER + 1))
+          IOS_BUILD_NUMBER=$((10#$BUILD_NUMBER + 5))
           xcode-project build-ipa \
             --project ios/App/App.xcodeproj \
             --scheme App \
