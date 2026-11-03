@@ -9,6 +9,7 @@ import PlanDialog from '@/components/library/PlanDialog';
 import PlanningDraftDialog from '@/components/library/PlanningDraftDialog';
 import EditorialCalendar from '@/components/library/EditorialCalendar';
 import EditorialPost from '@/components/library/EditorialPost';
+import '@/components/library/Library.css';
 import ConfirmAction from '@/components/ConfirmAction';
 import { toast } from 'sonner';
 import WorkspaceHeader from '@/components/WorkspaceHeader';
@@ -88,7 +89,15 @@ export default function Library() {
   const hasFilters = !!(search.trim() || platform || stage);
   const clearFilters = () => { setSearch(''); setPlatform(''); setStage(''); };
   const dayPosts = byDay.get(selected) || [];
-  const visiblePosts = view === 'unscheduled' ? unscheduled : view === 'drafts' ? filtered.filter(p => ['bozza', 'pronto', 'fallito'].includes(p.status)) : view === 'published' ? filtered.filter(p => p.status === 'pubblicato') : filtered;
+  let visiblePosts = filtered;
+  if (view === 'drafts') {
+    visiblePosts = filtered.filter(post => ['bozza', 'pronto', 'fallito'].includes(post.status));
+    visiblePosts.sort((a, b) => String(b.updated_date || b.created_date || '').localeCompare(String(a.updated_date || a.created_date || '')));
+  } else if (view === 'published') {
+    visiblePosts = filtered.filter(post => post.status === 'pubblicato');
+  } else if (view === 'unscheduled') {
+    visiblePosts = unscheduled;
+  }
   const planSaved = saved => { update(saved); setView(editorialDate(saved) ? 'calendar' : 'drafts'); };
   const actionText = {
     delete: ['Eliminare questo post?', 'Il contenuto verrà rimosso definitivamente dalla Libreria e dal calendario.', 'Elimina post'],
@@ -98,18 +107,14 @@ export default function Library() {
     published: ['Hai pubblicato questo contenuto?', 'Confermi una pubblicazione che hai già effettuato sui social. ClickSocial registra lo stato senza inviare il contenuto e il post diventa di sola lettura.', 'Conferma pubblicazione manuale'],
   }[action?.type];
   return <div className="min-h-screen bg-background">
-    <WorkspaceHeader subtitle="Libreria" />
+    <WorkspaceHeader subtitle="I miei post" />
     <main className="workspace-main space-y-5">
-      <div className="flex flex-col sm:flex-row items-start justify-between gap-4"><div className="min-w-0"><h1 className="workspace-title">I tuoi post</h1><p className="text-sm text-muted-foreground mt-2">Ritrova le bozze, modifica i post e pubblicali quando vuoi.</p></div>
+      <div className="flex items-center justify-between gap-3"><h1 className="workspace-title">I miei post</h1>
         <Button data-tour="library-new" onClick={() => navigate('/studio?new=1')} className="h-11 shrink-0">Nuovo post</Button>
       </div>
       <div role="group" aria-label="Vista della libreria" data-tour="library-views">
-        <label htmlFor="library-view" className="mb-2 block text-sm font-medium md:hidden">Visualizza</label>
-        <select id="library-view" className={selectClass + ' md:hidden'} value={view} onChange={e => setView(e.target.value)}>
-          <option value="list">Tutti i post</option><option value="drafts">Bozze</option><option value="published">Pubblicati</option><option value="calendar">Calendario</option><option value="agenda">Agenda</option><option value="unscheduled">Senza data</option>
-        </select>
-        <div className="section-tabs hidden md:flex md:flex-wrap">
-        <button type="button" className="section-tab" aria-pressed={view === 'list'} onClick={() => setView('list')}>Tutti i post</button>
+        <div className="section-tabs library-views">
+        <button type="button" className="section-tab" aria-pressed={view === 'list'} onClick={() => setView('list')}>Tutti</button>
         <button type="button" className="section-tab" aria-pressed={view === 'drafts'} onClick={() => setView('drafts')}>Bozze</button>
         <button type="button" className="section-tab" aria-pressed={view === 'published'} onClick={() => setView('published')}>Pubblicati</button>
         <button type="button" className="section-tab" aria-pressed={['calendar', 'agenda', 'unscheduled'].includes(view)} onClick={() => setView('calendar')}>Calendario</button>
@@ -118,7 +123,7 @@ export default function Library() {
       {['calendar', 'agenda', 'unscheduled'].includes(view) && <div className="flex flex-wrap gap-3 items-end"><div><label htmlFor="planning-view" className="block text-sm mb-1">Organizza per</label><select id="planning-view" className={selectClass} value={view} onChange={event => setView(event.target.value)}><option value="calendar">Calendario</option><option value="agenda">Agenda</option><option value="unscheduled">Senza data</option></select></div><Button data-tour="library-draft" variant="outline" onClick={() => setDraft({})} className="h-11">Annota un’idea</Button></div>}
       <div data-tour="library-filters" className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="w-full sm:w-auto sm:flex-1"><label htmlFor="post-search" className="sr-only">Cerca nei post</label><Input id="post-search" type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cerca titolo, testo o note" className="h-11 rounded-lg" /></div>
+          <div className="min-w-0 flex-1"><label htmlFor="post-search" className="sr-only">Cerca nei post</label><Input id="post-search" type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cerca un post" className="h-11 rounded-lg" /></div>
           <Button variant="outline" className="h-11" aria-expanded={showFilters} aria-controls="library-filter-fields" onClick={() => setShowFilters(value => !value)}>{showFilters ? 'Chiudi filtri' : platform || stage ? 'Filtri attivi' : 'Filtri'}</Button>
           <Button variant="ghost" className="h-11" disabled={refreshing} onClick={load}>{refreshing ? 'Aggiornamento…' : 'Aggiorna'}</Button>
         </div>
@@ -140,8 +145,11 @@ export default function Library() {
             {dayPosts.length ? <div className="divide-y divide-border">{dayPosts.map(p => card(p, true))}</div> : <div className="py-5 space-y-3"><p className="text-sm text-muted-foreground">{hasFilters ? 'Per questo giorno non ci sono post con i filtri attuali.' : 'Scegli un contenuto da pianificare e assegnagli questa data.'}</p>{unscheduled.length > 0 && <Button variant="outline" onClick={() => setView('unscheduled')}>Scegli un post da pianificare</Button>}</div>}
           </section>
         </div> : posts && <section aria-label={view === 'unscheduled' ? 'Post da pianificare' : view === 'drafts' ? 'Bozze' : view === 'published' ? 'Post pubblicati' : 'Tutti i post'}>
-          <p className="text-sm text-muted-foreground mb-4" role="status">{view === 'unscheduled' ? visiblePosts.length ? visiblePosts.length + (visiblePosts.length === 1 ? ' contenuto senza data. Scegli Pianifica per inserirlo nel calendario.' : ' contenuti senza data. Scegli Pianifica per inserirli nel calendario.') : hasFilters ? 'Nessun contenuto senza data con i filtri attuali.' : 'Tutti i contenuti hanno una data.' : visiblePosts.length + (view === 'drafts' ? visiblePosts.length === 1 ? ' bozza in preparazione' : ' bozze in preparazione' : visiblePosts.length === 1 ? ' contenuto salvato' : ' contenuti salvati')}</p>
-          {view === 'drafts' && !visiblePosts.length && <p className="text-sm text-muted-foreground mb-4">Nessuna bozza in preparazione con i filtri attuali.</p>}<div className="grid auto-rows-fr sm:grid-cols-2 xl:grid-cols-3 gap-4">{visiblePosts.map(p => card(p))}</div>
+          {view === 'unscheduled' && visiblePosts.length > 0 && <p className="text-sm text-muted-foreground mb-4">Scegli Pianifica nelle azioni del post per dargli una data.</p>}
+          {!visiblePosts.length && <p className="text-sm text-muted-foreground mb-4" role="status">
+            {view === 'drafts' ? 'Nessuna bozza in questa vista.' : view === 'published' ? 'Nessun post pubblicato in questa vista.' : 'Nessun post in questa vista.'}
+          </p>}
+          <div className="library-gallery">{visiblePosts.map(p => card(p))}</div>
         </section>}
     </main>
     {plan && <PlanDialog key={plan.id} post={plan} selectedDay={selected} onClose={() => setPlan(null)} onSaved={planSaved} />}

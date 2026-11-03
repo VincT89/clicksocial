@@ -3,7 +3,9 @@ import { Settings, X } from 'lucide-react';
 
 export default function StudioDrawer({ open, onOpenChange, children, tab, onTabChange, busy = false }) {
   return <Dialog.Root open={open} onOpenChange={onOpenChange}>
-    <Dialog.Trigger asChild><button type="button" data-tour="studio-settings" className="studio-settings-button" aria-label="Apri impostazioni Studio" title="Impostazioni Studio"><Settings size={24} aria-hidden="true" /></button></Dialog.Trigger>
+    <Dialog.Trigger asChild><button type="button" data-tour="studio-settings" className="studio-settings-button" aria-label="Personalizza il post">
+      <Settings size={19} aria-hidden="true" /> Personalizza
+    </button></Dialog.Trigger>
     <Dialog.Portal>
       <Dialog.Overlay className="studio-drawer-overlay" />
       <Dialog.Content className="studio-settings-drawer" aria-describedby="studio-settings-description">

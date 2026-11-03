@@ -17,11 +17,12 @@ const options = { title: 'Titolo della foto', privacy_level: 'SELF_ONLY', disabl
 // Header JPEG minimo per verificare le dimensioni: nessun provider reale riceve questa fixture.
 const jpeg = Buffer.from([255,216,255,192,0,11,8,4,56,4,56,1,1,17,0,255,217]);
 
-async function fixture(t) {
+async function fixture(t, overrides = {}) {
   const seen = [], control = { timeout: false, igStatus: 'FINISHED', ttStatus: 'PROCESSING_DOWNLOAD', revoked: false };
   const fetchImpl = async (value, init = {}) => {
     const url = new URL(value); seen.push({ url, init });
-    await control.before?.(url, init);
+    const reply = await control.before?.(url, init);
+    if (reply instanceof Response) return reply;
     if (control.revoked && url.pathname.endsWith('/me/permissions')) return Response.json({ error: { code: 190 } }, { status: 401 });
     if (url.hostname === 'graph.facebook.com') {
       if (url.pathname.endsWith('/oauth/access_token')) return Response.json({ access_token: 'fb-secret-fixture' });
@@ -48,7 +49,7 @@ async function fixture(t) {
     }
     assert.fail('Unexpected provider request: ' + url.origin + url.pathname);
   };
-  const app = await createApp({ ...await testDatabase(), dataDir:resolve('work/tests',randomUUID()), port:0, localMode:false, origin:'https://app.example.test', scheduler:false, smtpHost:'', openaiKey:'', stripeKey:'', metaId:'meta-test', metaSecret:'secret-test', metaLoginConfigId:'', instagramId:'ig-test', instagramSecret:'secret-test', tiktokKey:'tt-test', tiktokSecret:'secret-test', fetchImpl });
+  const app = await createApp({ ...await testDatabase(), dataDir:resolve('work/tests',randomUUID()), port:0, localMode:false, origin:'https://app.example.test', scheduler:false, smtpHost:'', openaiKey:'', stripeKey:'', metaId:'meta-test', metaSecret:'secret-test', metaLoginConfigId:'', instagramLoginConfigId:'', instagramId:'ig-test', instagramSecret:'secret-test', tiktokKey:'tt-test', tiktokSecret:'secret-test', ...overrides, fetchImpl });
   t.after(() => app.close());
   const user = { id:randomUUID(), plan:'pro', role:'user' }, other = { id:randomUUID(), plan:'pro', role:'user' };
   for (const u of [user, other]) await app.db.prepare('INSERT INTO users(id,email,verified,plan,created_at) VALUES (?,?,1,?,?)').run(u.id,u.id+'@example.test',u.plan,now());
@@ -243,6 +244,116 @@ test('Instagram: media temporaneo firmato, elaborazione e conferma pubblicazione
   assert.equal((await f.getPost(p.id)).status,'pubblicato');
   await f.tick(p.id);
   assert.equal(f.seen.filter(item=>item.url.pathname.endsWith('/media_publish')).length,1);
+});
+
+test('Instagram Unified Login collega soltanto i profili confermati e pubblica sul profilo scelto', async t => {
+  const f = await fixture(t, { instagramLoginConfigId: '12345', metaLoginConfigId: '54321', instagramId: '', instagramSecret: '' });
+  const assigned = [{ id: '81', username: 'negozio' }, { id: '82', username: 'bar' }];
+  const grant = { is_valid: true, type: 'SYSTEM_USER', app_id: 'meta-test', scopes: ['instagram_basic', 'instagram_content_publish'], expires_at: 0,
+    granular_scopes: [{ scope: 'instagram_content_publish', target_ids: ['81', '82'] }] };
+  f.control.before = (url, init) => {
+    assert.equal(url.hostname, 'graph.facebook.com');
+    if (url.pathname.endsWith('/oauth/access_token')) {
+      assert.equal(init.method, 'POST');
+      assert.equal(init.body.get('client_id'), 'meta-test');
+      assert.equal(init.body.get('redirect_uri'), f.app.config.origin + '/api/social/instagram/callback');
+      assert.equal(init.body.get('code'), 'code-test');
+      assert.equal(init.body.get('client_secret'), f.app.config.metaSecret);
+      assert.equal(url.search, '');
+      return Response.json({ access_token: 'simulazione-unified' });
+    }
+    if (url.pathname.endsWith('/debug_token')) {
+      assert.equal(url.searchParams.get('input_token'), 'simulazione-unified');
+      assert.equal(init.headers.Authorization, 'Bearer ' + f.app.config.metaId + '|' + f.app.config.metaSecret);
+      return Response.json({ data: grant });
+    }
+    assert.equal(init.headers.Authorization, 'Bearer simulazione-unified');
+    if (url.pathname.endsWith('/me/assigned_instagram_accounts')) {
+      assert.equal(url.searchParams.get('fields'), 'id,username');
+      if (url.searchParams.has('after')) return Response.json({ data: [assigned[1], { id: '83', username: 'senza_permesso' }] });
+      return Response.json({ data: [assigned[0]], paging: { next: 'https://untrusted.example.test', cursors: { after: 'pagina-due' } } });
+    }
+    if (url.pathname.endsWith('/82/media')) {
+      assert.equal(init.body.get('caption'), 'Foto di prova');
+      return Response.json({ id: 'contenitore' });
+    }
+    if (url.pathname.endsWith('/contenitore')) return Response.json({ status_code: 'FINISHED' });
+    if (url.pathname.endsWith('/82/media_publish')) return Response.json({ id: 'pubblicazione' });
+    if (url.pathname.endsWith('/pubblicazione')) return Response.json({ permalink: 'https://www.instagram.com/p/esempio/' });
+    assert.fail('Percorso inatteso: ' + url.pathname);
+  };
+  const start = await f.social.begin(f.user, 'instagram', true);
+  const auth = await f.social.authorize(start.id, new URL(start.url).searchParams.get('ticket'));
+  const login = new URL(auth.url);
+  assert.equal(login.origin + login.pathname, 'https://www.facebook.com/dialog/oauth');
+  assert.deepEqual(Object.fromEntries(login.searchParams), { redirect_uri: f.app.config.origin + '/api/social/instagram/callback',
+    response_type: 'code', state: start.id, client_id: 'meta-test', config_id: '12345', override_default_response_type: 'true', display: 'popup', prompt: 'login' });
+  await assert.rejects(() => f.social.complete('instagram', start.id, 'altro-browser', 'code-test', false), e => e.status === 400);
+  await f.social.complete('instagram', start.id, auth.browser, 'code-test', false);
+  const flow = await f.social.flow(f.user, start.id);
+  assert.equal(flow.stage, 'choose', flow.message);
+  assert.deepEqual(flow.accounts, [{ id: '81', name: '@negozio' }, { id: '82', name: '@bar' }]);
+  await assert.rejects(() => f.social.confirm(f.other, start.id, ['82']), e => e.status === 404);
+  await assert.rejects(() => f.social.confirm(f.user, start.id, ['83']), e => e.status === 400);
+  await f.social.confirm(f.user, start.id, ['82']);
+  const status = (await f.social.status(f.user, true)).instagram;
+  assert.equal(status.state, 'ready');
+  assert.deepEqual(status.accounts, [{ id: '82', name: '@bar' }]);
+  const stored = await f.app.db.prepare('SELECT encrypted FROM social_connections WHERE user_id=?').get(f.user.id);
+  assert.ok(!stored.encrypted.includes('simulazione-unified'));
+  const post = await f.post('instagram');
+  const body = { post_id: post.id, confirmed: true, caption: 'Foto di prova', account_id: '82' };
+  await assert.rejects(() => f.publication.enqueue(f.user, { ...body, account_id: '81' }), e => e.status === 400);
+  await f.publication.enqueue(f.user, body);
+  await f.publication.publishDuePosts();
+  await f.tick(post.id);
+  const published = await f.getPost(post.id);
+  assert.equal(published.status, 'pubblicato', published.schedule_error);
+  assert.equal(published.published_url, 'https://www.instagram.com/p/esempio/');
+  assert.equal(f.seen.filter(item => item.url.pathname.endsWith('/media_publish')).length, 1);
+  const scheduled = await f.post('instagram');
+  await f.publication.enqueue(f.user, { ...body, post_id: scheduled.id });
+  grant.scopes = ['instagram_basic'];
+  await f.publication.publishDuePosts();
+  assert.equal((await f.getPost(scheduled.id)).status, 'fallito');
+  assert.equal(f.seen.filter(item => item.url.pathname.endsWith('/media')).length, 1);
+  assert.equal((await f.social.status(f.user, true)).instagram.state, 'permissions');
+  grant.scopes.push('instagram_content_publish');
+  grant.app_id = 'altra-app';
+  assert.equal((await f.social.status(f.user, true)).instagram.state, 'reconnect');
+  grant.app_id = 'meta-test';
+  grant.is_valid = false;
+  assert.equal((await f.social.status(f.user, true)).instagram.state, 'reconnect');
+  grant.is_valid = true;
+  grant.expires_at = Math.floor(Date.now() / 1000) - 1;
+  assert.equal((await f.social.status(f.user, true)).instagram.state, 'reconnect');
+});
+
+test('Instagram mantiene il collegamento diretto e i post quando il nuovo consenso non condivide un profilo', async t => {
+  const f = await fixture(t);
+  await f.link('instagram');
+  const previous = (await readConnections(f.app.db, f.app.config, f.user.id)).instagram;
+  f.app.config.instagramLoginConfigId = '12345';
+  assert.equal((await f.social.verify(f.user, 'instagram')).accounts[0].id, 'ig1');
+  assert.equal(f.social.instagram(previous), 'https://graph.instagram.com/' + f.app.config.metaVersion);
+  f.control.before = url => {
+    if (url.pathname.endsWith('/debug_token')) return Response.json({ data: { app_id: 'meta-test', type: 'SYSTEM_USER', is_valid: true, scopes: ['instagram_basic', 'instagram_content_publish'] } });
+    if (url.pathname.endsWith('/me/assigned_instagram_accounts')) return Response.json({ data: [] });
+  };
+  const start = await f.social.begin(f.user, 'instagram');
+  const auth = await f.social.authorize(start.id, new URL(start.url).searchParams.get('ticket'));
+  await f.social.complete('instagram', start.id, auth.browser, 'code-test', false);
+  const rejected = await f.social.flow(f.user, start.id);
+  assert.equal(rejected.stage, 'error');
+  assert.match(rejected.message, /portfolio/);
+  assert.deepEqual((await readConnections(f.app.db, f.app.config, f.user.id)).instagram, previous);
+  const post = await f.post('instagram');
+  await f.publication.enqueue(f.user, { post_id: post.id, account_id: 'ig1', caption: 'Foto', confirmed: true });
+  await f.publication.publishDuePosts();
+  assert.equal((await f.getPost(post.id)).status, 'pubblicato');
+  assert.equal(f.seen.at(-1).url.hostname, 'graph.instagram.com');
+  f.app.config.metaSecret = '';
+  assert.equal((await f.social.status(f.user)).instagram.configured, false);
 });
 
 test('TikTok: opzioni reali, token rinnovato e stato di pubblicazione asincrono',async t => {

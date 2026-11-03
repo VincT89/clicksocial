@@ -5,8 +5,8 @@ import PhotoEditor from '@/components/studio/PhotoEditor';
 import { DEFAULT_FILTERS } from '@/lib/photoPresets';
 import { useStudioState } from '@/lib/StudioStateContext';
 import CopyPanel from '@/components/studio/CopyPanel';
+import PostCaption from '@/components/studio/PostCaption';
 import WorkspaceHeader from '@/components/WorkspaceHeader';
-import IconHint from '@/components/IconHint';
 import ConfirmAction from '@/components/ConfirmAction';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,6 +35,7 @@ export default function Studio() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const editorRef = useRef(null);
+  const requestDetails = useRef(null);
   const alive = useRef(true);
   const saveLock = useRef(false);
   const generateLock = useRef(false);
@@ -78,7 +79,8 @@ export default function Studio() {
       setPlatform(p.platform || 'instagram'); setTone(p.tone || defaultTone(me)); setMode(p.mode || (p.planning && !p.image_url ? DEFAULT_MODE : 'original'));
       setTitle(p.title || ''); setContext(p.context || ''); setPostStatus(p.status === 'fallito' ? 'pronto' : p.status || 'pronto');
       setDesign(p.design || null); setPlanning(p.planning || null); setEditorialAt(p.editorial_at || null);
-      setCopy({ headline:p.headline || '', caption:p.caption || p.planning?.provisional_copy || '', hashtags:p.hashtags || '', graphic_subtitle:p.graphic_subtitle || '', graphic_url:p.graphic_url || null, generated_mode:p.mode });
+      const savedGraphic = p.graphic_url || p.image_url;
+      setCopy({ headline:p.headline || '', caption:p.caption || p.planning?.provisional_copy || '', hashtags:p.hashtags || '', graphic_subtitle:p.graphic_subtitle || '', graphic_url:p.graphic_url || null, generated_mode:savedGraphic ? (p.mode || 'original') : undefined });
       let savedFilters = { ...DEFAULT_FILTERS };
       try { if (p.editor_filters) savedFilters = { ...savedFilters, ...JSON.parse(p.editor_filters) }; } catch { /* Older content uses the original filter. */ }
       setFilters(savedFilters); setActivePreset(p.editor_preset || 'Originale');
@@ -112,6 +114,7 @@ export default function Studio() {
   const generate = async () => {
     if (generateLock.current || saving || loading || locked || assetBusy || publishPost || !originalUrl || !canGenerate || !settings.aiEnabled || mode !== 'original' && !settings.imageAIEnabled) return;
     generateLock.current = true;
+    if (document.activeElement instanceof HTMLTextAreaElement) document.activeElement.blur();
     const revision = draftRevision.current;
     setDrawerOpen(false); setGenerationStage('post'); setGenerating(true);
     try {
@@ -125,6 +128,7 @@ export default function Studio() {
       if (draftRevision.current !== revision) return;
       if (result.data.design) { setDesign(result.data.design); setSelectedElement(null); }
       setCopy({ ...result.data, graphic_url:graphicUrl });
+      if (requestDetails.current) requestDetails.current.open = false;
       if (graphicUrl) { setFilters({ ...DEFAULT_FILTERS }); setActivePreset('Originale'); }
       if (!title) setTitle((result.data.headline || 'Post ' + platform).slice(0,60));
       if (alive.current) setMe(await api.auth.me().catch(() => me));
@@ -191,11 +195,44 @@ export default function Studio() {
   </section>;
   const controlsDisabled = saving || generating || loading || locked || assetBusy || !!publishPost || !!loadError;
   const activeDesign = design || newPostDesign(me);
-  const hasContent = !!(copy?.headline || copy?.caption || copy?.graphic_url);
+  /** Il testo provvisorio della pianificazione resta nella bozza, ma non indica che la foto sia già diventata un post. */
+  const provisionalCopy = planning && !copy?.generated_mode && copy?.caption === planning.provisional_copy;
+  const hasContent = !!(copy?.headline || copy?.graphic_url || copy?.hashtags || (copy?.caption && !provisionalCopy));
   const aiAvailable = !!settings.aiEnabled && (mode === 'original' || !!settings.imageAIEnabled);
   const changeDesign = value => setDesign(current => typeof value === 'function' ? value(current || newPostDesign(me)) : value);
   const convertLegacy = () => { setDesign(newPostDesign(me)); setMode('original'); setCopy({ ...copy, graphic_url: null }); };
   const selectElement = role => { setSelectedElement(role); if (role) setDrawerTab('graphic'); };
+  const requestField = (
+    <div className="studio-brief">
+      <label htmlFor="post-context" className="text-sm font-medium">
+        Cosa vuoi comunicare? <span className="text-xs font-normal text-muted-foreground">(facoltativo)</span>
+      </label>
+      <textarea id="post-context" value={context} onChange={event => setContext(event.target.value)}
+        maxLength={2000} rows={2} readOnly={locked} disabled={controlsDisabled && !locked} placeholder="Es. oggi caffè a 1 euro" />
+    </div>
+  );
+  const generateButton = (
+    <Button data-tour="studio-generate" onClick={generate} disabled={controlsDisabled || !aiAvailable || !canGenerate}
+      variant={hasContent ? 'ghost' : 'default'}>
+      {generating ? 'Generazione in corso…' : hasContent ? 'Rigenera' : 'Genera'}
+    </Button>
+  );
+  const saveButtons = !locked && (
+    <div className="studio-save-actions">
+      {hasContent && <Button data-tour="studio-publish" onClick={() => save('publish')} disabled={controlsDisabled}>Pubblica</Button>}
+      <Button data-tour="studio-save" onClick={() => save('draft')} variant="outline" disabled={controlsDisabled} aria-busy={saving}>
+        {saving ? 'Salvataggio…' : 'Salva in bozze'}
+      </Button>
+    </div>
+  );
+  let generationNote;
+  if (!aiAvailable) {
+    generationNote = 'La generazione non è disponibile al momento. Puoi salvare la foto in bozza.';
+  } else if (!canGenerate) {
+    generationNote = <>Hai utilizzato le generazioni gratuite. <Link className="underline" to="/profilo?section=plan">Apri il piano</Link></>;
+  } else if (!hasContent) {
+    generationNote = 'Prepariamo grafica, descrizione e hashtag per ' + PLATFORMS[String(platform).toLowerCase()] + '.';
+  }
   const drawer = <StudioDrawer open={drawerOpen} onOpenChange={open => { if (!assetBusy) setDrawerOpen(open); }} tab={drawerTab} onTabChange={setDrawerTab} busy={assetBusy}>
     <fieldset disabled={controlsDisabled} className="space-y-5 min-w-0">
       {drawerTab === 'graphic' && <>
@@ -216,10 +253,10 @@ export default function Studio() {
       </>}
       {drawerTab === 'copy' && <div data-tour="studio-copy"><CopyPanel platform={platform} setPlatform={setPlatform} tone={tone} setTone={setTone} mode={mode} setMode={setMode} generating={generating} copy={copy} setCopy={setCopy} imageText={activeDesign.text_mode === 'image'} templateMode={!!design || !originalUrl} autoTextStyle={activeDesign.ai_text_style === true} onAutoTextStyleChange={enabled => changeDesign(current => ({ ...current, ai_text_style: enabled }))} /></div>}
       {drawerTab === 'post' && <>
-        <div data-tour="studio-title" className="space-y-2"><label htmlFor="post-title" className="text-sm font-medium">Titolo nella Libreria</label><Input id="post-title" value={title} onChange={event => setTitle(event.target.value)} maxLength={200} placeholder="Nome interno del contenuto" /></div>
+        <div data-tour="studio-title" className="space-y-2"><label htmlFor="post-title" className="text-sm font-medium">Titolo del post salvato</label><Input id="post-title" value={title} onChange={event => setTitle(event.target.value)} maxLength={200} placeholder="Nome interno del contenuto" /></div>
         <p className="text-sm text-muted-foreground">Salva in bozze conserva il post per dopo. Pubblica apre la conferma dell’account di destinazione.</p>
         {planningSummary}
-        <p className="text-sm text-muted-foreground">{isNative ? 'La bozza viene conservata su questo dispositivo. Salva il post per ritrovarlo nella Libreria.' : 'La bozza resta disponibile quando cambi sezione. Salva prima di ricaricare o chiudere la pagina.'}</p>
+        <p className="text-sm text-muted-foreground">{isNative ? 'La bozza viene conservata su questo dispositivo. Salvala per ritrovarla anche in I miei post.' : 'La bozza resta disponibile quando cambi sezione. Salva prima di ricaricare o chiudere la pagina.'}</p>
         {!isPro && <p className="text-sm text-muted-foreground">Generazioni AI disponibili: {remaining}. <Link className="underline" to="/profilo?section=plan">Apri il piano</Link></p>}
       </>}
     </fieldset>
@@ -227,23 +264,46 @@ export default function Studio() {
   return <div className="studio-shell bg-background">
     <WorkspaceHeader subtitle="Studio" />
     <main className="studio-main">
-      {loading ? <p role="status">Caricamento del post…</p> : loadError ? <div role="alert" className="space-y-3"><p>{loadError}</p><Button onClick={() => loadPost(id)}>Riprova</Button><Button variant="outline" asChild><Link to="/library">Torna alla Libreria</Link></Button></div> : <>
-        <div className="studio-toolbar"><h1 className="font-heading text-lg truncate">{title || (editingId ? 'Il tuo post' : 'Crea il tuo post')}</h1>{originalUrl && <IconHint label="Nuova foto"><button type="button" disabled={controlsDisabled} onClick={() => setReplacement({ id: null })} className="nav-icon" aria-label="Nuova foto"><Plus size={20} aria-hidden="true" /></button></IconHint>}</div>
-        {locked && <p className="text-xs text-muted-foreground">{postStatus === 'pubblicato' ? 'Post pubblicato: sola lettura.' : 'Annulla l’invio automatico dalla Libreria per modificare il post.'} <Link to="/library" className="underline">Apri Libreria</Link></p>}
+      {loading ? <p role="status">Caricamento del post…</p> : loadError ? <div role="alert" className="space-y-3"><p>{loadError}</p><Button onClick={() => loadPost(id)}>Riprova</Button><Button variant="outline" asChild><Link to="/library">Vai ai miei post</Link></Button></div> : <>
+        <div className="studio-toolbar">
+          <h1 className="font-heading text-lg truncate">{title || (editingId ? 'Il tuo post' : 'Crea il tuo post')}</h1>
+          {originalUrl && <Button variant="ghost" disabled={controlsDisabled} onClick={() => setReplacement({ id: null })}>
+            <Plus size={18} aria-hidden="true" /> Nuovo post
+          </Button>}
+        </div>
+        {locked && <p className="text-xs text-muted-foreground">{postStatus === 'pubblicato' ? 'Post pubblicato: sola lettura.' : 'Annulla l’invio automatico da I miei post per modificarlo.'} <Link to="/library" className="underline">Vai ai miei post</Link></p>}
         <div className="studio-content">
           {!originalUrl ? <div className="studio-empty"><PhotoUploader onUploaded={uploaded} /></div> : <PhotoEditor ref={editorRef} disabled={controlsDisabled} imageUrl={copy?.graphic_url || originalUrl} headline={design || !copy?.graphic_url ? copy?.headline || null : null} subtitle={copy?.graphic_subtitle || ''} design={design} filters={filters} onDesignChange={changeDesign} selectedElement={selectedElement} onSelectElement={selectElement} elementLayout={elementLayout} onLayoutChange={setElementLayout} onWarningChange={setGraphicWarning} />}
           {originalUrl && <section className="studio-result" aria-label="Il tuo post">
-            <div className="studio-brief" data-tour="studio-context"><label htmlFor="post-context" className="text-sm font-medium">Cosa vuoi comunicare? <span className="text-xs font-normal text-muted-foreground">(facoltativo)</span></label><textarea id="post-context" value={context} onChange={event => setContext(event.target.value)} maxLength={2000} rows={2} readOnly={locked} disabled={controlsDisabled && !locked} placeholder="Es. oggi caffè a 1 euro" /></div>
-            {hasContent && <div className="studio-caption" data-tour="studio-copy-result"><label htmlFor="post-caption" className="block text-sm font-medium">Descrizione del post</label><textarea id="post-caption" value={[copy?.caption, copy?.hashtags].filter(Boolean).join('\n\n')} onChange={event => setCopy({ ...copy, caption: event.target.value, hashtags: '' })} readOnly={locked} disabled={controlsDisabled && !locked} maxLength={10000} rows={3} placeholder="Il testo che accompagnerà la foto" /><p className="text-xs text-muted-foreground">{locked ? 'Testo salvato con il post.' : 'Puoi correggere il testo prima di pubblicare.'}</p></div>}
-            {originalUrl && !locked && <div className="studio-actions">
-              <Button data-tour="studio-generate" onClick={generate} disabled={controlsDisabled || !aiAvailable || !canGenerate} variant={hasContent ? 'outline' : 'default'}>{generating ? 'Generazione in corso…' : hasContent ? 'Rigenera' : 'Genera'}</Button>
-              {!aiAvailable ? <p className="studio-action-note" role="status">La generazione non è disponibile al momento. Puoi salvare la foto in bozza.</p> : !canGenerate ? <p className="studio-action-note">Hai utilizzato le generazioni gratuite. <Link className="underline" to="/profilo?section=plan">Apri il piano</Link></p> : !hasContent && <p className="studio-action-note">Prepariamo grafica, descrizione e hashtag per {PLATFORMS[String(platform).toLowerCase()]}.</p>}
-              <div className="studio-save-actions"><Button data-tour="studio-save" onClick={() => save('draft')} variant="outline" disabled={controlsDisabled} aria-busy={saving}>{saving ? 'Salvataggio…' : 'Salva in bozze'}</Button>{hasContent && <Button data-tour="studio-publish" onClick={() => save('publish')} disabled={controlsDisabled}>Pubblica</Button>}</div>
-            </div>}
+            {hasContent ? <>
+              <PostCaption platform={PLATFORMS[String(platform).toLowerCase()]}
+                value={[copy?.caption, copy?.hashtags].filter(Boolean).join('\n\n')}
+                onChange={caption => setCopy({ ...copy, caption, hashtags: '' })}
+                readOnly={locked} disabled={controlsDisabled && !locked} />
+              {saveButtons}
+              {(!locked || context) && <div className="studio-revision">
+                <details ref={requestDetails} data-tour="studio-context">
+                  <summary aria-label={locked ? 'Leggi la richiesta' : 'Modifica richiesta'}>
+                    <span className="studio-request-text">{context.trim() || 'Dalla foto'}</span>
+                    <span className="studio-request-toggle">{locked ? 'Leggi' : 'Modifica richiesta'}</span>
+                  </summary>
+                  {requestField}
+                </details>
+                {!locked && generateButton}
+              </div>}
+              {!locked && generationNote && <p className="studio-action-note" role="status">{generationNote}</p>}
+            </> : <>
+              <div data-tour="studio-context">{requestField}</div>
+              {!locked && <div className="studio-actions">
+                {generateButton}
+                {generationNote && <p className="studio-action-note" role="status">{generationNote}</p>}
+                {saveButtons}
+              </div>}
+            </>}
           </section>}
         </div>
       </>}
-      <div className="studio-footer"><p className="text-xs text-muted-foreground">{locked ? 'Apri la Libreria per gestire il post.' : 'Vuoi personalizzarlo? Le impostazioni sono facoltative.'}</p>{drawer}</div>
+      <div className="studio-footer">{drawer}</div>
     </main>
     <ConfirmAction open={!!replacement} onOpenChange={open => { if (!open) keepDraft(); }} title="Sostituire la bozza aperta?" description="Le modifiche non salvate della bozza corrente verranno perse." confirmLabel="Sostituisci bozza" onConfirm={replaceDraft} busy={saving || generating || assetBusy} destructive />
     {publishPost && <ScheduleDialog post={publishPost} open onOpenChange={open => { if (!open) setPublishPost(null); }} onScheduled={async () => { setPublishPost(null); resetDraft(); navigate('/library'); }} />}

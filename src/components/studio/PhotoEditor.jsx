@@ -1,4 +1,6 @@
-import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import * as Dialog from '@radix-ui/react-dialog';
+import { Maximize2 } from 'lucide-react';
 import { acquireImage } from '@/lib/mobile';
 import { drawFilteredImage } from '@/lib/photoFilters';
 import { layoutHeadline } from '@/lib/headlineLayout';
@@ -54,6 +56,14 @@ const PhotoEditor = forwardRef(/** @param {{imageUrl:string,headline?:string,sub
   const [exporting, setExporting] = useState(false);
   const [rendering, setRendering] = useState(false);
   const canvasRef = useRef(null);
+  const copyPreview = useCallback(canvas => {
+    const original = canvasRef.current;
+    if (!canvas || !original) return;
+    /** Copiamo solo i pixel già disegnati: l’anteprima ingrandita include il logo, senza maniglie o nuovi caricamenti. */
+    canvas.width = original.width;
+    canvas.height = original.height;
+    canvas.getContext('2d').drawImage(original, 0, 0);
+  }, []);
   const [loaded, setLoaded] = useState(null);
   const [imageError, setImageError] = useState("");
   const viewportRef = useRef(null);
@@ -131,17 +141,36 @@ const PhotoEditor = forwardRef(/** @param {{imageUrl:string,headline?:string,sub
     getFilters: () => filters,
   }));
 
-  return <div data-tour="studio-editor" className="studio-editor" aria-busy={rendering || exporting || !source}>
+  return <Dialog.Root><div data-tour="studio-editor" className="studio-editor" aria-busy={rendering || exporting || !source}>
     <div ref={viewportRef} className="studio-preview-viewport">
       <div className="studio-preview-frame" style={{ width, height: width / ratio }}>
-        <canvas ref={canvasRef} role="img" aria-label={headline ? `Anteprima della foto con il titolo: ${headline}` : 'Anteprima della foto'} className={`block h-full w-full ${!source ? 'invisible' : ''}`} />
+        <Dialog.Trigger asChild>
+          <button type="button" className="studio-preview-open" aria-label="Apri anteprima a tutto schermo"
+            disabled={!source || !!imageError || rendering || exporting} onClick={() => onSelectElement?.('')}>
+            <canvas ref={canvasRef} role="img" aria-label={headline ? `Anteprima della foto con il titolo: ${headline}` : 'Anteprima della foto'} className={`block h-full w-full ${!source ? 'invisible' : ''}`} />
+            <Maximize2 size={18} className="studio-preview-open-icon" aria-hidden="true" />
+          </button>
+        </Dialog.Trigger>
         {!source && <p role={imageError ? 'alert' : 'status'} className="absolute inset-0 flex items-center justify-center p-4 text-sm text-muted-foreground text-center">{imageError || 'Caricamento dell’anteprima…'}</p>}
         {source && design && !imageError && <ElementOverlay design={design} onChange={onDesignChange} layout={elementLayout} selected={selectedElement} onSelect={onSelectElement} disabled={disabled || exporting} />}
       </div>
     </div>
     {source && imageError && <p role="alert" className="studio-preview-warning">{imageError}</p>}
     {exporting && <p role="status" className="text-xs text-muted-foreground">Esportazione foto…</p>}
-  </div>;
+  </div>
+    <Dialog.Portal>
+      <Dialog.Overlay className="studio-drawer-overlay" />
+      <Dialog.Content className="studio-full-preview" aria-describedby={undefined}>
+        <div className="studio-full-preview-header">
+          <Dialog.Title className="font-heading text-lg">Anteprima del post</Dialog.Title>
+          <Dialog.Close asChild><button type="button" aria-label="Chiudi anteprima">Chiudi</button></Dialog.Close>
+        </div>
+        <div className="studio-full-preview-image">
+          <canvas ref={copyPreview} role="img" aria-label={headline || 'Anteprima del post'} />
+        </div>
+      </Dialog.Content>
+    </Dialog.Portal>
+  </Dialog.Root>;
 });
 
 export default PhotoEditor;

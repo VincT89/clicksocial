@@ -1,16 +1,39 @@
-import { NavLink } from 'react-router-dom';
-import { Building2, Code2 } from 'lucide-react';
+import { NavLink, useLocation } from 'react-router-dom';
+import * as Dialog from '@radix-ui/react-dialog';
+import { Building2, Code2, Menu, X } from 'lucide-react';
 import { isAdminAccount } from '@/lib/adminAccess';
-import IconHint from '@/components/IconHint';
 
 const sections = [
-  { to: '/admin', label: 'Area azienda', icon: Building2 },
-  { to: '/sviluppatore', label: 'Sviluppatore', icon: Code2 },
+  { to: '/admin', label: 'Area azienda', detail: 'Clienti e account', icon: Building2 },
+  { to: '/sviluppatore', label: 'Sviluppatore', detail: 'Verifiche e consumi AI', icon: Code2 },
 ];
 
-export default function AdminNav({ account, mobile = false, onNavigate = undefined }) {
+export default function AdminNav({ account, mobile = false }) {
+  const { pathname } = useLocation();
   if (!isAdminAccount(account)) return null;
-  return <div role="group" aria-label="Amministrazione" data-tour="profile-administration" className="flex items-center gap-1 border-l border-border pl-2">
-    {sections.map(({ to, label, icon: Icon }) => <IconHint key={to} label={label} side={mobile ? 'top' : 'bottom'}><NavLink to={to} aria-label={label} onClick={onNavigate ? event => onNavigate(event, to) : undefined} className="nav-icon"><Icon size={20} aria-hidden="true" /></NavLink></IconHint>)}
-  </div>;
+  const current = sections.some(section => section.to === pathname);
+  return <Dialog.Root key={pathname}>
+    <Dialog.Trigger asChild>
+      <button type="button" className="workspace-nav-link" data-tour="profile-administration" aria-current={current ? 'true' : undefined}>
+        <Menu size={20} aria-hidden="true" /><span>Gestione</span>
+      </button>
+    </Dialog.Trigger>
+    <Dialog.Portal>
+      <Dialog.Overlay className="app-sheet-overlay" />
+      <Dialog.Content className="app-sheet management-sheet" aria-describedby={undefined}>
+        <header className="app-sheet-header">
+          <Dialog.Title>Gestione</Dialog.Title>
+          <Dialog.Close asChild><button type="button" className="nav-icon" aria-label="Chiudi gestione"><X size={20} aria-hidden="true" /></button></Dialog.Close>
+        </header>
+        {sections.map(({ to, label, detail, icon: Icon }) => (
+          <Dialog.Close asChild key={to}>
+            <NavLink to={to} replace={mobile} className="management-link">
+              <Icon size={21} aria-hidden="true" />
+              <span><strong>{label}</strong><small>{detail}</small></span>
+            </NavLink>
+          </Dialog.Close>
+        ))}
+      </Dialog.Content>
+    </Dialog.Portal>
+  </Dialog.Root>;
 }

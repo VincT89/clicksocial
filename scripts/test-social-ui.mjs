@@ -14,19 +14,20 @@ mkdirSync(directory, { recursive:true });
 const origin = 'https://clicksocial-ui.example.test';
 let deniedProvider = '';
 const permissions = values => ({ data:values.map(permission => ({ permission, status:'granted' })) });
+const instagramConfig = '10001';
 const fetchImpl = async (value) => {
   const url = new URL(value);
   if (url.hostname === 'graph.facebook.com') {
     if (url.pathname.endsWith('/oauth/access_token')) return Response.json({ access_token:'test-token' });
+    if (url.pathname.endsWith('/debug_token')) return Response.json({ data:{ app_id:'test', type:'SYSTEM_USER', is_valid:true, scopes:['instagram_basic','instagram_content_publish'] } });
+    if (url.pathname.endsWith('/me/assigned_instagram_accounts')) return Response.json({ data:[{ id:'secondo-test', username:'secondo_profilo' }, { id:'instagram-test', username:'profilo_di_collaudo' }] });
+    if (url.pathname.endsWith('/instagram-test/media')) return Response.json({ id:'contenitore-test' });
+    if (url.pathname.endsWith('/contenitore-test')) return Response.json({ status_code:'FINISHED' });
+    if (url.pathname.endsWith('/instagram-test/media_publish')) return Response.json({ id:'foto-test' });
+    if (url.pathname.endsWith('/foto-test')) return Response.json({ permalink:'https://www.instagram.com/p/collaudo/' });
     if (url.pathname.endsWith('/me/permissions')) return Response.json(permissions(['pages_show_list','pages_read_engagement','pages_manage_posts']));
     if (url.pathname.endsWith('/me/accounts')) return Response.json({ data:[{ id:'page-one', name:'Prima pagina di collaudo', access_token:'test-one' }, { id:'page-two', name:'Seconda pagina di collaudo', access_token:'test-two' }] });
     if (url.pathname.endsWith('/photos')) return Response.json({ post_id:'test-published' });
-  }
-  if (url.hostname === 'api.instagram.com' && url.pathname.endsWith('/oauth/access_token')) return Response.json({ access_token:'ig-short-test' });
-  if (url.hostname === 'graph.instagram.com') {
-    if (url.pathname === '/access_token') return Response.json({ access_token:'ig-test', expires_in:5184000 });
-    if (url.pathname.endsWith('/me')) return Response.json({ user_id:'instagram-test', username:'profilo_di_collaudo', account_type:'BUSINESS' });
-    if (url.pathname.endsWith('/me/permissions')) return Response.json(permissions(['instagram_business_basic','instagram_business_content_publish']));
   }
   if (url.hostname === 'open.tiktokapis.com') {
     if (url.pathname.endsWith('/oauth/token/')) return Response.json({ access_token:'tt-test', refresh_token:'tt-refresh-test', open_id:'tiktok-test', scope:'user.info.basic,video.publish', expires_in:86400 });
@@ -38,7 +39,7 @@ const fetchImpl = async (value) => {
 let app, browser;
 try {
   app = await createApp({ dataDir:join(directory,'data'), dbDriver:'sqlite', origin, localMode:false, port:0, scheduler:false,
-    smtpHost:'', openaiKey:'', stripeKey:'', googleId:'', metaId:'test', metaSecret:'test', metaLoginConfigId:'', instagramId:'test', instagramSecret:'test', tiktokKey:'test', tiktokSecret:'test', fetchImpl });
+    smtpHost:'', openaiKey:'', stripeKey:'', googleId:'', metaId:'test', metaSecret:'test', metaLoginConfigId:'', instagramLoginConfigId:instagramConfig, instagramId:'', instagramSecret:'', tiktokKey:'test', tiktokSecret:'test', fetchImpl });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   const local = 'http://127.0.0.1:' + app.server.address().port;
   browser = await chromium.launch({ headless:true, ...(process.env.CLICKSOCIAL_BROWSER_CHANNEL ? { channel:process.env.CLICKSOCIAL_BROWSER_CHANNEL } : {}) });
@@ -56,8 +57,8 @@ try {
       if (url.pathname === '/api/social/authorize' && response.status() === 302) {
         // Il backend prepara il consenso vero; solo la pagina del fornitore viene sostituita con una fixture locale.
         const destination = new URL(response.headers().location);
-        const provider = destination.hostname === 'www.facebook.com' && destination.pathname.endsWith('/dialog/oauth') ? 'facebook'
-          : destination.hostname === 'www.instagram.com' && destination.pathname === '/oauth/authorize' ? 'instagram'
+        const provider = destination.hostname === 'www.facebook.com' && destination.pathname.endsWith('/dialog/oauth')
+          ? (destination.searchParams.get('config_id') === instagramConfig ? 'instagram' : 'facebook')
           : destination.hostname === 'www.tiktok.com' && destination.pathname === '/v2/auth/authorize/' ? 'tiktok' : '';
         assert.ok(provider, 'Destinazione OAuth non prevista');
         assert.equal(destination.searchParams.get('redirect_uri'), origin + '/api/social/' + provider + '/callback');
@@ -200,6 +201,7 @@ try {
     await page.getByRole('button', { name:'Conferma account selezionati' }).click();
     await assertEnabled('Ricollega ' + name);
     assert.equal(await page.getByRole('alert').count(), 0);
+    if (provider === 'instagram') assert.deepEqual((await app.integrations.social.status(user)).instagram.accounts, [{ id:'instagram-test', name:account }]);
   }
   console.log('Collegamenti Instagram e TikTok confermati senza sostituire Facebook.');
 
@@ -239,14 +241,12 @@ try {
     await layout('studio-' + width);
     await guide('guida-studio-' + width);
     await page.goto(origin + '/library');
-    await page.getByRole('heading', { name:'Libreria e pianificazione' }).waitFor();
-    const listButton = page.getByRole('button', { name:'Tutti i post', exact:true });
-    if (await listButton.isVisible()) await listButton.click();
-    else await page.getByRole('combobox', { name:'Visualizza' }).selectOption('list');
+    await page.getByRole('heading', { name:'I miei post' }).waitFor();
+    await page.getByRole('button', { name:'Tutti', exact:true }).click();
     await page.getByRole('article', { name:'Collaudo tiktok' }).waitFor();
     await layout('libreria-' + width);
     await guide('guida-libreria-' + width);
-    await page.getByRole('article', { name:'Collaudo tiktok' }).getByRole('button', { name:'Pubblica foto' }).click();
+    await page.getByRole('article', { name:'Collaudo tiktok' }).getByRole('button', { name:'Pubblica', exact:true }).click();
     await page.getByLabel('Account di destinazione').waitFor();
     await page.getByLabel('Account di destinazione').selectOption('tiktok-test');
     await layout('invio-tiktok-' + width);
@@ -265,7 +265,7 @@ try {
     console.log('Interfaccia e guide verificate a ' + width + '×' + height + '.');
   }
   // Conferma esplicita completa, conversione JPEG e persistenza tramite il vero backend di test.
-  await page.getByRole('article', { name:'Collaudo instagram' }).getByRole('button', { name:'Pubblica foto' }).click();
+  await page.getByRole('article', { name:'Collaudo instagram' }).getByRole('button', { name:'Pubblica', exact:true }).click();
   await page.getByLabel('Account di destinazione').selectOption('instagram-test');
   await page.getByLabel('Testo e hashtag').fill('Testo approvato nel collaudo');
   await page.getByRole('button', { name:'Conferma pubblicazione', exact:true }).click();
@@ -274,12 +274,16 @@ try {
   assert.equal(queued.status,'in_coda'); assert.equal(queued.social_job.caption,'Testo approvato nel collaudo');
   const file = await app.db.prepare('SELECT mime FROM files WHERE id=?').get(queued.social_job.image_url.split('/').pop());
   assert.equal(file.mime,'image/jpeg');
+  await app.integrations.publication.publishDuePosts();
+  await page.getByRole('button', { name:'Aggiorna', exact:true }).click();
+  await page.getByRole('article', { name:'Collaudo instagram' }).getByText('Pubblicato', { exact:true }).waitFor();
+  console.log('Post Instagram pubblicato e visibile in Libreria con il fornitore simulato.');
   // Un'anteprima non disponibile non deve consentire un invio alla cieca.
   const broken = JSON.parse((await app.db.prepare('SELECT data FROM posts WHERE id=?').get(posts.facebook)).data);
   broken.image_url = '/api/files/' + randomUUID();
   await app.db.prepare('UPDATE posts SET data=? WHERE id=?').run(JSON.stringify(broken),posts.facebook);
   await page.getByRole('button', { name:'Aggiorna', exact:true }).click();
-  await page.getByRole('article', { name:'Collaudo facebook' }).getByRole('button', { name:'Pubblica foto' }).click();
+  await page.getByRole('article', { name:'Collaudo facebook' }).getByRole('button', { name:'Pubblica', exact:true }).click();
   await page.getByLabel('Pagina Facebook').selectOption('page-two');
   await page.getByText('Non riesco a mostrare la foto.', { exact:false }).waitFor();
   assert.ok(await page.getByRole('button', { name:'Conferma pubblicazione', exact:true }).isDisabled());

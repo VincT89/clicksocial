@@ -1,12 +1,12 @@
 # ClickSocial — guida all’uso
 
-Aggiornata il 2 novembre 2026. Questa guida descrive le funzioni presenti nella copia locale APP: creazione del post, personalizzazioni facoltative, bozze, Libreria, collegamenti social e collaudo mobile. Le integrazioni social richiedono l’attivazione del gestore e il collaudo con account reali. ClickSocial è un progetto di [Sodano Consulting](https://sodanoconsulting.it/).
+Aggiornata il 3 novembre 2026. Questa guida descrive creazione dei post, personalizzazioni, bozze, libreria, collegamenti social e collaudo mobile nella copia locale APP. Le integrazioni social richiedono l’attivazione del gestore e il collaudo con account reali. ClickSocial è un progetto di [Sodano Consulting](https://sodanoconsulting.it/).
 
 Per caricare il sito sul server e trasferire i dati consulta [PLESK.md](PLESK.md). Dopo il trasferimento usa l’indirizzo HTTPS comunicato dal gestore. L’app iPhone deve essere ricompilata per quel server: una build configurata con l’indirizzo del PC continua a richiederne la disponibilità. La programmazione dei post richiede inoltre che il gestore mantenga attivo il servizio o un’attività pianificata, anche quando nessuno visita il sito.
 
 ## Orientarsi nell’app
 
-**Profilo** contiene i dati dell’attività, i loghi, i colori, i font, il template predefinito, i collegamenti social e l’account. **Studio** serve a preparare fotografia, grafica e testi. **Libreria** raccoglie bozze e post salvati e permette di assegnare le date.
+La barra dell’app ha tre destinazioni. **Crea post** apre lo Studio. **I miei post** apre la libreria di bozze, post pubblicati e calendario. **Profilo** contiene attività, loghi, colori, font, collegamenti social e account. Per gli amministratori compare anche **Gestione**, che raccoglie **Area azienda** e **Sviluppatore**.
 
 La barra di navigazione si trova in alto sul computer e in basso sul telefono. Il pulsante **Guida** illustra i controlli presenti nella schermata aperta. Usa **Avanti**, **Indietro**, **Fine** o **Chiudi guida**; sul computer puoi chiudere anche con Esc. Nel Profilo, per leggere la guida di Social, Piano o Account, chiudi la guida, apri quella sezione e avviala nuovamente.
 
@@ -128,7 +128,7 @@ Ogni template prevede posizioni e margini per tutti e quattro i formati. Cambiar
 
 ## Lavorare nello Studio
 
-Lo Studio mostra foto, descrizione e azioni principali. Dopo aver scelto la foto premi **Genera**: per i nuovi post è già attiva **Grafica AI**, che compone fotografia e scritte insieme. Il logo originale resta separato e spostabile; descrizione e hashtag restano modificabili. Per cambiare le scritte nella grafica, aggiorna **Cosa vuoi comunicare?** e premi **Rigenera**. Controlla il risultato, poi scegli **Pubblica** oppure **Salva in bozze**. L’ingranaggio in basso a destra apre soltanto le personalizzazioni facoltative:
+Lo Studio mostra foto, descrizione e azioni principali. Dopo aver scelto la foto premi **Genera**. Per i nuovi post è già attiva **Grafica AI**, che compone fotografia e scritte insieme. Il logo originale resta separato e spostabile. A generazione completata puoi correggere la descrizione e gli hashtag, poi scegliere **Pubblica** oppure **Salva in bozze** subito sotto. Tocca la foto per controllarla a tutto schermo. Per cambiare le scritte nella grafica, apri **Modifica richiesta**, aggiorna le indicazioni e premi **Rigenera**. Il pulsante **Personalizza** in basso a destra apre le impostazioni del post.
 
 - **Grafica**: modifica posizione e dimensione del logo. Nelle modalità con testi modificabili puoi scegliere anche titolo e testo di supporto, font, spessore, colore e allineamento. Le sezioni espandibili contengono formato, loghi e palette; gli schemi iniziali sono disponibili per le scritte modificabili. Cambiare formato a una Grafica AI richiede **Rigenera** per adattare le scritte.
 - **Foto**: regola filtri e ritocco. Il ritaglio manuale è disponibile quando le scritte sono modificabili; Grafica AI mantiene l’inquadratura completa.
@@ -180,13 +180,13 @@ I filtri rapidi applicano una combinazione di regolazioni. Per modificare una ba
 | --- | --- |
 | Titolo grafica | Il messaggio principale disegnato sulla foto. |
 | Testo di supporto nella grafica | Un testo breve sulla foto; è facoltativo. |
-| Descrizione del post | Il testo che accompagna la pubblicazione, modificabile nella schermata principale. |
+| Descrizione per il social scelto | Il testo che accompagna la pubblicazione, modificabile nella schermata principale. |
 | Hashtag | Sono inclusi nella descrizione del post. |
-| Titolo nella Libreria | Il nome interno per riconoscere il contenuto. |
+| Titolo del post salvato | Il nome interno per riconoscere il contenuto. |
 
 Nelle modalità con scritte modificabili, titolo e testo di supporto vengono misurati con i font scelti e adattati allo spazio. Se il testo è troppo lungo per rimanere leggibile, lo Studio segnala il problema e impedisce l’esportazione: accorcialo o cambia template. Sposta nella caption i dettagli che non servono nella grafica.
 
-**Descrizione del post**, nella schermata principale, contiene testo e hashtag. Puoi modificarli direttamente. In Libreria, **Altre azioni → Copia testo** li copia negli appunti. Salvare una bozza non pubblica nulla.
+La descrizione indica il social scelto, per esempio **Descrizione per Instagram**. Puoi correggere direttamente testo e hashtag. Per una descrizione lunga, **Leggi e modifica** apre il testo completo e **Applica al post** conferma le correzioni. Per i post in sola lettura il comando è **Leggi tutto**.
 
 ### Salvare e riprendere
 
@@ -206,7 +206,7 @@ Un post già pubblicato è in sola lettura. Per modificare un contenuto in coda 
 
 ## Libreria, date e pubblicazione
 
-**Tutti i post** è la vista iniziale. **Bozze** raccoglie i contenuti ancora modificabili, comprese le idee senza foto; **Pubblicati** quelli già pubblicati. **Calendario** permette di organizzare date e idee. Da lì puoi scegliere anche **Agenda** o **Senza data**. Sul telefono usa **Visualizza**.
+In **I miei post** puoi scegliere **Tutti**, **Bozze**, **Pubblicati** o **Calendario** anche dal telefono. La grafica, il titolo e lo stato aiutano a riconoscere il post. In **Bozze** trovi per prima quella modificata più di recente. Tocca la grafica per aprirla. Nel Calendario trovi anche **Agenda** e **Senza data**.
 
 La ricerca considera titolo, testi, note e brief. I filtri restringono i risultati per piattaforma e stato. **Azzera filtri** torna alla visualizzazione completa; **Aggiorna** rilegge i dati dal backend.
 
@@ -237,7 +237,7 @@ Il servizio di invio deve essere configurato e attivo sul backend. Il semplice a
 
 In **Profilo → Social** trovi Facebook, Instagram e TikTok separati. Premi **Collega**, accedi sul sito ufficiale del social, autorizza ClickSocial e torna nell’app. Seleziona l’account o le Pagine corrette e premi **Conferma account selezionati**. Su iPhone usa **Torna a ClickSocial** o chiudi la finestra di autorizzazione per rientrare nel Profilo. Il gestore configura l’app sviluppatore della società; il cliente non deve creare app né inserire chiavi API.
 
-Facebook richiede una Pagina su cui puoi pubblicare. Instagram richiede un account professionale Business o Creator; il percorso Instagram Login usato qui non richiede di collegarlo a una Pagina Facebook. Se appare **Attivazione a cura del gestore**, la configurazione del servizio manca ancora. L’accesso Google, quando configurato, resta un collegamento separato e nel collaudo nativo si usa email e password.
+Facebook richiede una Pagina su cui puoi pubblicare. Per Instagram serve un profilo professionale Business o Creator. Con l’accesso unificato, scegli su Meta il portfolio che contiene il profilo della tua attività, poi conferma in ClickSocial i profili da usare. Se appare **Attivazione a cura del gestore**, la configurazione del servizio manca ancora. L’accesso Google, quando configurato, resta un collegamento separato e nel collaudo nativo si usa email e password.
 
 **Verifica collegamenti** controlla le autorizzazioni attuali. **Ricollega** serve dopo scadenza, revoca dei permessi o cambiamento dell’account; annullare il nuovo tentativo conserva il collegamento precedente. Il tentativo scade dopo 15 minuti. **Scollega** rimuove l’accesso salvato in ClickSocial e annulla solo la coda di quel social; gli altri social, le foto e le date editoriali restano. Per revocare anche il consenso dato al fornitore usa le impostazioni del social. Se un invio è in corso o incerto, completane prima la verifica.
 

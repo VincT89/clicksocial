@@ -60,12 +60,21 @@ export function socialRequest(fetchImpl = fetch) {
 const bearer = accessToken => ({ Authorization: 'Bearer ' + accessToken });
 export const jsonBody = value => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(value) });
 
+export function socialAccounts(provider, connection) {
+  const accounts = provider === 'facebook' ? connection.pages || [] : connection.accounts || [connection.account];
+  return accounts.map(({ id, name }) => ({ id: String(id), name }));
+}
+
 export function createSocialConnections(db, config, fetchImpl = fetch) {
   const call = socialRequest(fetchImpl);
   const graph = () => 'https://graph.facebook.com/' + config.metaVersion;
-  const instagram = () => 'https://graph.instagram.com/' + config.metaVersion;
+  const instagram = connection => connection?.login === 'unified' ? graph() : 'https://graph.instagram.com/' + config.metaVersion;
   const callback = provider => config.origin + '/api/social/' + provider + '/callback';
-  const configured = provider => ({ facebook: config.metaId && config.metaSecret, instagram: config.instagramId && config.instagramSecret, tiktok: config.tiktokKey && config.tiktokSecret })[provider];
+  const configured = provider => ({
+    facebook: config.metaId && config.metaSecret,
+    instagram: config.instagramLoginConfigId ? config.metaId && config.metaSecret : config.instagramId && config.instagramSecret,
+    tiktok: config.tiktokKey && config.tiktokSecret,
+  })[provider];
   function requireConfig(provider) {
     socialProvider(provider);
     if (!configured(provider)) fail(503, SOCIAL_NAMES[provider] + ' deve essere attivato dal gestore di ClickSocial.', 'integration_unconfigured');
@@ -85,10 +94,43 @@ export function createSocialConnections(db, config, fetchImpl = fetch) {
     }
     return pages;
   }
-  const safeAccounts = (provider, connection) => provider === 'facebook'
-    ? (connection.pages || []).map(page => ({ id: String(page.id), name: page.name }))
-    : [{ id: String(connection.account.id), name: connection.account.name }];
-  async function exchange(provider, code) {
+  async function unifiedInstagramAccess(accessToken) {
+    const base = graph();
+    const headers = bearer(accessToken);
+    const { data: grant } = await call(base + '/debug_token?' + new URLSearchParams({ input_token: accessToken }), {
+      headers: bearer(config.metaId + '|' + config.metaSecret),
+    });
+    if (grant?.is_valid !== true || grant.type !== 'SYSTEM_USER' || String(grant.app_id) !== config.metaId) {
+      fail(409, 'Autorizzazione Instagram scaduta o revocata. Ricollega il profilo.', 'social_reconnect');
+    }
+    const required = ['instagram_basic', 'instagram_content_publish'];
+    if (!Array.isArray(grant.scopes) || !required.every(scope => grant.scopes.includes(scope))) fail(409, 'Consenti la pubblicazione dei post quando colleghi Instagram.', 'social_permissions');
+    const limits = [grant.expires_at, grant.data_access_expires_at].filter(seconds => seconds > 0);
+    const expiresAt = limits.length ? Math.min(...limits) * 1000 : null;
+    if (expiresAt && expiresAt <= Date.now()) fail(409, 'Autorizzazione Instagram scaduta. Ricollega il profilo.', 'social_reconnect');
+    const targets = required.map(scope => grant.granular_scopes?.find(item => item.scope === scope)?.target_ids).filter(Array.isArray);
+    const accounts = new Map(), cursors = new Set();
+    let after;
+    /** Il token identifica l’utente di sistema. Solo gli account assegnati e autorizzati possono diventare destinazioni. */
+    do {
+      const query = new URLSearchParams({ fields: 'id,username', limit: '100' });
+      if (after) query.set('after', after);
+      const page = await call(base + '/me/assigned_instagram_accounts?' + query, { headers });
+      if (!Array.isArray(page.data)) fail(502, 'Meta non ha restituito l’elenco dei profili Instagram.');
+      for (const { id, username } of page.data) {
+        if (typeof id === 'string' && id && targets.every(ids => ids.includes(id))) {
+          accounts.set(id, { id, name: username ? '@' + username : id });
+        }
+      }
+      if (!page.paging?.next) break;
+      after = page.paging.cursors?.after;
+      if (!after || cursors.has(after) || cursors.size >= 100) fail(502, 'Meta non ha completato l’elenco dei profili Instagram. Riprova selezionando i profili della tua attività.');
+      cursors.add(after);
+    } while (after);
+    if (!accounts.size) fail(409, 'Seleziona il portfolio che contiene il tuo profilo Instagram Business o Creator e autorizza la pubblicazione su quel profilo.', 'social_permissions');
+    return { accounts: [...accounts.values()], expiresAt };
+  }
+  async function exchange(provider, code, instagramLogin) {
     if (!code || code.length > 4096) fail(400, 'Il social non ha restituito il codice di autorizzazione.');
     if (provider === 'facebook') {
       const short = await call(graph() + '/oauth/access_token?' + new URLSearchParams({ client_id: config.metaId, client_secret: config.metaSecret, redirect_uri: callback(provider), code }));
@@ -98,6 +140,12 @@ export function createSocialConnections(db, config, fetchImpl = fetch) {
       return { accessToken: long.access_token, pages };
     }
     if (provider === 'instagram') {
+      if (instagramLogin === 'unified') {
+        const body = new URLSearchParams({ client_id: config.metaId, client_secret: config.metaSecret, redirect_uri: callback(provider), code });
+        const auth = await call(graph() + '/oauth/access_token', { method: 'POST', body });
+        if (typeof auth.access_token !== 'string' || !auth.access_token) fail(502, 'Meta non ha restituito l’autorizzazione Instagram.');
+        return { login: 'unified', accessToken: auth.access_token, ...await unifiedInstagramAccess(auth.access_token) };
+      }
       const short = await call('https://api.instagram.com/oauth/access_token', { method: 'POST', body: new URLSearchParams({ client_id: config.instagramId, client_secret: config.instagramSecret, grant_type: 'authorization_code', redirect_uri: callback(provider), code }) });
       const long = await call('https://graph.instagram.com/access_token?' + new URLSearchParams({ grant_type: 'ig_exchange_token', client_secret: config.instagramSecret, access_token: short.access_token }));
       const profile = await call(instagram() + '/me?fields=user_id,username,account_type', { headers: bearer(long.access_token) });
@@ -134,10 +182,19 @@ export function createSocialConnections(db, config, fetchImpl = fetch) {
     const browser = token();
     delete context.ticket;
     Object.assign(context, { stage: 'waiting', browser: digest(config, browser) });
+    if (provider === 'instagram' && config.instagramLoginConfigId) context.instagramLogin = 'unified';
     await updateFlow(row, context);
     const params = new URLSearchParams({ redirect_uri: callback(provider), response_type: 'code', state: id, scope: scopes[provider].join(',') });
     let base;
-    if (provider === 'facebook') {
+    if (context.instagramLogin === 'unified') {
+      base = 'https://www.facebook.com/dialog/oauth';
+      params.delete('scope');
+      params.set('client_id', config.metaId);
+      params.set('config_id', config.instagramLoginConfigId);
+      params.set('override_default_response_type', 'true');
+      params.set('display', 'popup');
+      params.set('prompt', 'login');
+    } else if (provider === 'facebook') {
       base = 'https://www.facebook.com/' + config.metaVersion + '/dialog/oauth'; params.set('client_id', config.metaId);
       if (config.metaLoginConfigId) { params.set('config_id', config.metaLoginConfigId); params.delete('scope'); }
     } else if (provider === 'instagram') {
@@ -153,7 +210,7 @@ export function createSocialConnections(db, config, fetchImpl = fetch) {
     const processing = JSON.stringify(context);
     try {
       if (denied) fail(400, 'Autorizzazione annullata. Il collegamento precedente non è stato modificato.');
-      context.candidate = encrypt(config, await exchange(provider, code));
+      context.candidate = encrypt(config, await exchange(provider, code, context.instagramLogin));
       context.stage = 'choose';
     } catch (error) { context.stage = 'error'; context.message = error.status ? error.message : 'Collegamento non completato. Riprova dal Profilo.'; }
     // Non resuscitare un tentativo annullato mentre il provider rispondeva.
@@ -164,7 +221,7 @@ export function createSocialConnections(db, config, fetchImpl = fetch) {
   async function flow(user, id) {
     const { context, provider } = await flowRow(id);
     if (context.userId !== user.id) fail(404, 'Collegamento non trovato.');
-    return { id, provider, stage: context.stage, message: context.message, accounts: context.stage === 'choose' ? safeAccounts(provider, decrypt(config, context.candidate)) : [] };
+    return { id, provider, stage: context.stage, message: context.message, accounts: context.stage === 'choose' ? socialAccounts(provider, decrypt(config, context.candidate)) : [] };
   }
   async function confirm(user, id, ids) {
     return transaction(db, async () => {
@@ -172,12 +229,18 @@ export function createSocialConnections(db, config, fetchImpl = fetch) {
       if (context.userId !== user.id) fail(404, 'Collegamento non trovato.');
       if (['completed', 'cancelled'].includes(context.stage)) fail(410, 'Questo tentativo di collegamento è già stato chiuso.');
       if (context.stage !== 'choose' || !Array.isArray(ids) || !ids.length) fail(400, 'Scegli almeno un account da collegare.');
-      const connection = decrypt(config, context.candidate), accounts = safeAccounts(provider, connection);
+      const connection = decrypt(config, context.candidate), accounts = socialAccounts(provider, connection);
       if (ids.some(id => !accounts.some(account => account.id === id))) fail(400, 'Account non autorizzato.');
       const posts = await db.prepare('SELECT data FROM posts WHERE user_id=?').all(user.id);
       const pending = posts.map(row => JSON.parse(row.data)).filter(post => post.platform === provider && ['in_pubblicazione', 'da_verificare'].includes(post.status));
       if (pending.some(post => !ids.includes(post.social_job?.account_id || post.social_page_id))) fail(409, 'Un invio è in corso o da verificare. Puoi rinnovare il collegamento allo stesso account; prima di cambiarlo risolvi l’esito in Libreria.');
+      if (provider === 'instagram' && pending.length) {
+        const previous = (await readConnections(db, config, user.id)).instagram;
+        /** Il contenitore di una foto già in elaborazione appartiene al metodo di accesso con cui è stato creato. */
+        if (previous && previous.login !== connection.login) fail(409, 'Completa o verifica l’invio in Libreria prima di cambiare il metodo di accesso Instagram.');
+      }
       if (provider === 'facebook') connection.pages = connection.pages.filter(page => ids.includes(String(page.id)));
+      if (connection.login === 'unified') connection.accounts = accounts.filter(account => ids.includes(account.id));
       connection.connectedAt = now();
       await writeConnection(db, config, user.id, provider, connection);
       // Le altre finestre possono leggere l'esito, senza conservare credenziali né consentire un secondo consenso.
@@ -198,6 +261,10 @@ export function createSocialConnections(db, config, fetchImpl = fetch) {
   async function connection(user, provider) {
     const current = (await readConnections(db, config, user.id))[provider];
     if (!current) fail(409, 'Collega ' + SOCIAL_NAMES[provider] + ' dal Profilo.', 'social_reconnect');
+    if (current.login === 'unified') {
+      if (current.expiresAt && current.expiresAt <= Date.now()) fail(409, 'Autorizzazione Instagram scaduta. Ricollega il profilo.', 'social_reconnect');
+      return current;
+    }
     const needsRefresh = provider === 'tiktok' && current.expiresAt < Date.now() + 300000 || provider === 'instagram' && current.expiresAt < Date.now() + 7 * 86400000 && current.refreshedAt < Date.now() - 86400000;
     if (!needsRefresh) return current;
     const key = user.id + ':' + provider;
@@ -246,9 +313,15 @@ export function createSocialConnections(db, config, fetchImpl = fetch) {
       const pages = await facebookPages(saved.accessToken);
       const selected = pages.filter(page => saved.pages.some(old => String(old.id) === String(page.id)));
       if (!selected.length) fail(409, 'Le Pagine selezionate non sono più accessibili. Ricollega Facebook.', 'social_permissions');
-      return { connection: { ...saved, pages: selected }, accounts: safeAccounts(provider, { pages: selected }) };
+      return { connection: { ...saved, pages: selected }, accounts: socialAccounts(provider, { pages: selected }) };
     }
     if (provider === 'instagram') {
+      if (saved.login === 'unified') {
+        const { accounts } = await unifiedInstagramAccess(saved.accessToken);
+        const selected = accounts.filter(account => saved.accounts.some(old => old.id === account.id));
+        if (!selected.length) fail(409, 'Il profilo Instagram selezionato non è più accessibile. Ricollega Instagram.', 'social_permissions');
+        return { connection: { ...saved, accounts: selected }, accounts: selected };
+      }
       const profile = await call(instagram() + '/me?fields=user_id,username,account_type', { headers: bearer(saved.accessToken) });
       const permissions = await call(instagram() + '/me/permissions', { headers: bearer(saved.accessToken) });
       if (String(profile.user_id || profile.id) !== saved.account.id || !scopes.instagram.every(scope => permissions.data?.some(item => item.permission === scope && item.status === 'granted'))) fail(409, 'Account o permessi Instagram cambiati. Ricollega Instagram.', 'social_permissions');
@@ -260,7 +333,7 @@ export function createSocialConnections(db, config, fetchImpl = fetch) {
   async function status(user, live = false) {
     const saved = await readConnections(db, config, user.id), output = {};
     await Promise.all(Object.keys(SOCIAL_NAMES).map(async provider => {
-      let state = { configured: !!configured(provider), connected: !!saved[provider], state: saved[provider] ? 'saved' : 'disconnected', accounts: saved[provider] ? safeAccounts(provider, saved[provider]) : [] };
+      let state = { configured: !!configured(provider), connected: !!saved[provider], state: saved[provider] ? 'saved' : 'disconnected', accounts: saved[provider] ? socialAccounts(provider, saved[provider]) : [] };
       if (live && saved[provider]) {
         try { const checked = await verify(user, provider); state = { ...state, state: 'ready', accounts: checked.accounts }; }
         catch (error) { state.state = error.code === 'social_reconnect' ? 'reconnect' : error.code === 'social_permissions' ? 'permissions' : 'unavailable'; state.message = error.status ? error.message : 'Verifica temporaneamente non disponibile.'; }

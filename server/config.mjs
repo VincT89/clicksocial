@@ -20,6 +20,7 @@ export function loadConfig(overrides = {}) {
     googleId: env.GOOGLE_CLIENT_ID || '', googleSecret: env.GOOGLE_CLIENT_SECRET || '',
     metaId: env.META_APP_ID || '', metaSecret: env.META_APP_SECRET || '', metaVersion: env.META_GRAPH_VERSION || 'v25.0',
     metaLoginConfigId: env.META_LOGIN_CONFIG_ID || '',
+    instagramLoginConfigId: env.INSTAGRAM_LOGIN_CONFIG_ID || '',
     instagramId: env.INSTAGRAM_APP_ID || '', instagramSecret: env.INSTAGRAM_APP_SECRET || '',
     tiktokKey: env.TIKTOK_CLIENT_KEY || '', tiktokSecret: env.TIKTOK_CLIENT_SECRET || '',
     smtpHost: env.SMTP_HOST || '', smtpPort: Number(env.SMTP_PORT || 587), smtpSecure: env.SMTP_SECURE === 'true',

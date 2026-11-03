@@ -85,7 +85,11 @@ const AuthenticatedApp = () => {
 
 function AppNotifications() {
   const { pathname } = useLocation();
-  return <SonnerToaster className="app-notifications" position={pathname === '/studio' ? 'top-center' : 'bottom-right'} offset={{ top: 80, bottom: 24, left: 24, right: 24 }} mobileOffset={{ top: 'calc(80px + env(safe-area-inset-top))', bottom: 88, left: 16, right: 16 }} />;
+  const { isAuthenticated } = useAuth();
+  const bottom = isAuthenticated ? 'calc(var(--app-tab-space) + 16px)' : 'calc(env(safe-area-inset-bottom) + 16px)';
+  return <SonnerToaster className="app-notifications" position={pathname === '/studio' ? 'top-center' : 'bottom-right'}
+    offset={{ top: 'calc(80px + env(safe-area-inset-top))', bottom, left: 'max(24px, env(safe-area-inset-left))', right: 'max(24px, env(safe-area-inset-right))' }}
+    mobileOffset={{ top: 'calc(80px + env(safe-area-inset-top))', bottom, left: 'max(16px, env(safe-area-inset-left))', right: 'max(16px, env(safe-area-inset-right))' }} />;
 }
 
 function App() {

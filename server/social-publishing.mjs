@@ -1,7 +1,7 @@
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { digest, fail, now, transaction } from './store.mjs';
 import { ownedImage } from './files.mjs';
-import { jsonBody, socialProvider, readConnections } from './social-connections.mjs';
+import { jsonBody, socialAccounts, socialProvider, readConnections } from './social-connections.mjs';
 
 function jpegSize(bytes) {
   if (bytes[0] !== 255 || bytes[1] !== 216) return null;
@@ -77,8 +77,7 @@ export function createSocialPublishing(db, config, social) {
       // Impedisce che la disconnessione, eseguita durante la verifica remota, lasci un nuovo invio in coda.
       const connected = (await readConnections(db, config, user.id))[data.platform];
       if (!connected) fail(409, 'Il collegamento social è stato rimosso.');
-      const ids = data.platform === 'facebook' ? connected.pages.map(page => String(page.id)) : [connected.account.id];
-      if (!ids.includes(body.account_id)) fail(409, 'Il collegamento social è cambiato. Seleziona di nuovo l’account.');
+      if (!socialAccounts(data.platform, connected).some(account => account.id === body.account_id)) fail(409, 'Il collegamento social è cambiato. Seleziona di nuovo l’account.');
       data.social_job = { version: 1, attempt: randomUUID(), phase: 'prepared', account_id: body.account_id, account_name: checked.accounts.find(a => a.id === body.account_id).name, image_url: '/api/files/' + image.id, caption, options };
       Object.assign(data, { status: 'in_coda', scheduled_at: when.toISOString(), editorial_at: when.toISOString(), social_page_id: body.account_id, schedule_error: '' });
       await db.prepare('UPDATE posts SET data=?,updated_at=? WHERE id=?').run(JSON.stringify(data), now(), row.id);
@@ -142,7 +141,10 @@ export function createSocialPublishing(db, config, social) {
           if (!user) fail(404, 'Account non disponibile.');
           if (user.plan !== 'pro' && !job.remote_id) fail(402, 'Il piano Pro non è attivo.');
           const provider = socialProvider(data.platform);
-          const connection = await social.connection(user, provider);
+          /** Prima di esporre la foto a Instagram, verifica che l'account scelto sia ancora autorizzato anche per un invio programmato. */
+          const connection = provider === 'instagram' && job.phase === 'prepared'
+            ? (await social.verify(user, provider)).connection
+            : await social.connection(user, provider);
           const headers = { Authorization: 'Bearer ' + connection.accessToken };
           const done = url => { data.status = 'pubblicato'; data.published_url = url || ''; data.published_at = now(); data.publication_method = provider; data.schedule_error = ''; job.phase = 'done'; };
           if (provider === 'facebook') {
@@ -155,22 +157,23 @@ export function createSocialPublishing(db, config, social) {
             if (!output.post_id || String(output.post_id).length > 200) throw Object.assign(new Error('Facebook non ha confermato il post. Controlla la Pagina prima di riprovare.'), { uncertain: true });
             job.remote_id = String(output.post_id); done('https://www.facebook.com/' + encodeURIComponent(output.post_id));
           } else if (provider === 'instagram') {
-            if (connection.account.id !== job.account_id) fail(409, 'L’account Instagram è cambiato. Ricollega quello scelto per questo post.');
+            if (!socialAccounts(provider, connection).some(account => account.id === job.account_id)) fail(409, 'L’account Instagram è cambiato. Ricollega quello scelto per questo post.');
+            const graph = social.instagram(connection);
             if (job.phase === 'prepared') {
-              const output = await social.call(social.instagram() + '/' + encodeURIComponent(job.account_id) + '/media', { method: 'POST', headers, body: new URLSearchParams({ image_url: mediaUrl(row.id, job, row.user_id), caption: job.caption }) });
+              const output = await social.call(graph + '/' + encodeURIComponent(job.account_id) + '/media', { method: 'POST', headers, body: new URLSearchParams({ image_url: mediaUrl(row.id, job, row.user_id), caption: job.caption }) });
               if (!output.id) fail(502, 'Instagram non ha accettato la foto.');
               job.container_id = String(output.id); job.phase = 'processing'; await save();
             }
-            const status = await social.call(social.instagram() + '/' + encodeURIComponent(job.container_id) + '?fields=status_code', { headers });
+            const status = await social.call(graph + '/' + encodeURIComponent(job.container_id) + '?fields=status_code', { headers });
             if (status.status_code === 'PUBLISHED') done();
             else if (['ERROR', 'EXPIRED'].includes(status.status_code)) { job.phase = 'failed'; fail(502, 'Instagram non ha elaborato la foto. Verifica il formato e riprova.'); }
             else if (status.status_code === 'FINISHED') {
               job.phase = 'commit'; await save();
-              const output = await social.call(social.instagram() + '/' + encodeURIComponent(job.account_id) + '/media_publish', { method: 'POST', headers, body: new URLSearchParams({ creation_id: job.container_id }) });
+              const output = await social.call(graph + '/' + encodeURIComponent(job.account_id) + '/media_publish', { method: 'POST', headers, body: new URLSearchParams({ creation_id: job.container_id }) });
               if (!output.id) throw Object.assign(new Error('Instagram non ha confermato l’esito. Controlla il profilo prima di riprovare.'), { uncertain: true });
               job.remote_id = String(output.id); done(); await save();
               // Il post è già confermato: un errore nel solo permalink non deve trasformarlo in fallimento.
-              try { const info = await social.call(social.instagram() + '/' + encodeURIComponent(output.id) + '?fields=permalink', { headers }); if (/^https:\/\/(www\.)?instagram\.com\//.test(info.permalink || '')) data.published_url = info.permalink; } catch { /* Link facoltativo. */ }
+              try { const info = await social.call(graph + '/' + encodeURIComponent(output.id) + '?fields=permalink', { headers }); if (/^https:\/\/(www\.)?instagram\.com\//.test(info.permalink || '')) data.published_url = info.permalink; } catch { /* Link facoltativo. */ }
             }
           } else {
             if (connection.account.id !== job.account_id) fail(409, 'L’account TikTok è cambiato. Ricollega quello scelto per questo post.');

@@ -1,6 +1,6 @@
 # Collegamenti social della società
 
-Aggiornamento del 23 settembre 2026. L’app sviluppatore appartiene alla società che offre ClickSocial. Ogni cliente autorizza i propri account; i token sono conservati cifrati sul backend e non sono condivisi tra clienti. Nessuna credenziale reale viene fornita o modificata da questo documento.
+L’app sviluppatore appartiene alla società che offre ClickSocial. Ogni cliente autorizza i propri account. Il server conserva i token cifrati e associa ogni collegamento al cliente che lo ha confermato.
 
 ## Configurazione del gestore
 
@@ -11,20 +11,25 @@ Le variabili nuove sono elencate in `.env.example`. Vanno inserite soltanto nel 
 | Servizio | Credenziali della società | Callback da registrare, preceduto da APP_ORIGIN |
 | --- | --- | --- |
 | Facebook Pages | `META_APP_ID`, `META_APP_SECRET`; `META_LOGIN_CONFIG_ID` se si usa la configurazione Facebook Login for Business | `/api/social/facebook/callback` |
-| Instagram Login | `INSTAGRAM_APP_ID`, `INSTAGRAM_APP_SECRET` dal prodotto Instagram dell’app Meta; non presumere che coincidano con quelli Facebook | `/api/social/instagram/callback` |
+| Instagram con Unified Login | `META_APP_ID`, `META_APP_SECRET` e `INSTAGRAM_LOGIN_CONFIG_ID` della configurazione Instagram | `/api/social/instagram/callback` |
+| Instagram con accesso diretto esistente | `INSTAGRAM_APP_ID` e `INSTAGRAM_APP_SECRET` del prodotto Instagram | `/api/social/instagram/callback` |
 | TikTok Login Kit e Content Posting API | `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET` | `/api/social/tiktok/callback` |
 
 Il percorso precedente `/api/oauth/facebook/callback` resta compatibile con le vecchie versioni web. Le nuove versioni usano i callback della tabella. Il collegamento Google non cambia.
 
 Facebook richiede `pages_show_list`, `pages_read_engagement` e `pages_manage_posts`. Se si imposta `META_LOGIN_CONFIG_ID`, la configurazione aziendale deve includere questi permessi. Il cliente deve concedere l’accesso alle Pagine e avere il compito di pubblicarvi.
 
-Instagram usa il prodotto **Instagram API with Instagram Login**, per account professionali Business o Creator, con `instagram_business_basic` e `instagram_business_content_publish`. Questo percorso non richiede una Pagina Facebook collegata. Gli access token a lunga durata vengono rinnovati quando prossimi alla scadenza, se ancora rinnovabili; altrimenti l’interfaccia richiede il nuovo consenso.
+Per una nuova app Meta scegli **API Instagram (accesso unificato)**. Nel pannello Meta salva l’indirizzo di ritorno della tabella e seleziona la configurazione. Copia il suo ID in `INSTAGRAM_LOGIN_CONFIG_ID`. In Plesk, sotto **Node.js → Environment**, inserisci questo ID e `META_APP_ID` tra le variabili, e il segreto dell’app Meta in **Secrets** con il nome `META_APP_SECRET`. Riavvia l’app Node.js dopo aver salvato. `META_LOGIN_CONFIG_ID` riguarda solo le Pagine Facebook.
+
+Dal Profilo, **Collega Instagram** apre il consenso Meta. Il cliente seleziona il portfolio della propria attività e concede accesso ai profili Business o Creator su cui vuole pubblicare. ClickSocial verifica i permessi `instagram_basic` e `instagram_content_publish`, mostra i profili assegnati e chiede quali collegare. Prima di ogni invio il cliente sceglie la destinazione. Un consenso revocato o scaduto richiede di ricollegare il profilo.
+
+Le installazioni Meta con il precedente accesso diretto possono continuare a usarlo con le proprie credenziali Instagram. Attivando Unified Login i nuovi consensi passano da Meta. Ogni collegamento già salvato continua a usare il proprio metodo fino alla successiva autorizzazione.
 
 TikTok richiede `user.info.basic` e `video.publish`. Le foto vengono inviate con Direct Post, non come semplice bozza nella casella TikTok. Il dominio o prefisso URL `APP_ORIGIN/api/social/media/` deve essere verificato nelle proprietà URL dell’app TikTok. Gli access token sono rinnovati dal backend usando il refresh token.
 
 La società deve completare la configurazione dei prodotti, degli URL, delle informazioni richieste nei portali e delle revisioni necessarie per servire clienti esterni. Aggiungere le chiavi non dimostra di avere ottenuto l’approvazione. Prima dell’audit, TikTok impone restrizioni ai test e alla visibilità. I permessi effettivi vanno verificati negli account aziendali; questo aggiornamento non cambia i portali Meta o TikTok.
 
-Riferimenti del fornitore: [Instagram Login, raccolta ufficiale Meta](https://www.postman.com/meta/instagram/folder/6raa77c/instagram-api-with-instagram-login), [TikTok Login Kit Web](https://developers.tiktok.com/docs/en/login-kit-web), [TikTok Direct Post](https://developers.tiktok.com/docs/en/content-posting-api-get-started), [requisiti dell’esperienza di condivisione](https://developers.tiktok.com/docs/en/content-sharing-guidelines).
+Per i dettagli consulta le guide dei fornitori. [Instagram Unified Login](https://developers.facebook.com/documentation/instagram-platform/instagram-api-with-unified-login/get-started), [Migrazione dall’accesso Instagram](https://developers.facebook.com/documentation/instagram-platform/instagram-api-with-instagram-login/migration-guide), [TikTok Login Kit Web](https://developers.tiktok.com/docs/en/login-kit-web), [TikTok Direct Post](https://developers.tiktok.com/docs/en/content-posting-api-get-started), [requisiti dell’esperienza di condivisione](https://developers.tiktok.com/docs/en/content-sharing-guidelines).
 
 ## Percorso del cliente
 

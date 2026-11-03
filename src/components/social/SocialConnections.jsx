@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import ConfirmAction from '@/components/ConfirmAction';
 
 const names = { facebook: 'Facebook', instagram: 'Instagram', tiktok: 'TikTok' };
-const help = { facebook: 'Collega le Pagine che gestisci. I profili personali non sono supportati.', instagram: 'Serve un account professionale Business o Creator. L’accesso avviene su Instagram.', tiktok: 'Autorizza il profilo e la pubblicazione delle foto. Le opzioni dipendono dai permessi del tuo account.' };
+const help = { facebook: 'Collega le Pagine che gestisci. I profili personali non sono supportati.', instagram: 'Autorizza il tuo profilo Business o Creator su Meta, poi scegli su quale profilo pubblicare.', tiktok: 'Autorizza il profilo e la pubblicazione delle foto. Le opzioni dipendono dai permessi del tuo account.' };
 const labels = { ready: 'Collegamento verificato', saved: 'Da verificare', reconnect: 'Da ricollegare', permissions: 'Permessi da aggiornare', unavailable: 'Verifica non disponibile', disconnected: 'Non collegato' };
 export default function SocialConnections({ active = true }) {
   const { user } = useAuth();
