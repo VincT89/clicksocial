@@ -55,8 +55,10 @@ workflows:
     environment:
       node: 24.22.1
       xcode: latest
+      vars:
+        MOBILE_API_ORIGIN: "https://s4.sodanoconsulting.it"
+        MOBILE_LOCAL_TEST: "false"
       groups:
-        - clicksocial_local
         - clicksocial_apple
       ios_signing:
         distribution_type: app_store
@@ -69,7 +71,11 @@ workflows:
             echo "Avvia questa compilazione dal branch main_vincenzo."
             exit 1
           fi
-          for variable in MOBILE_API_ORIGIN APP_STORE_CONNECT_PRIVATE_KEY APP_STORE_CONNECT_KEY_IDENTIFIER APP_STORE_CONNECT_ISSUER_ID; do
+          if [[ "${MOBILE_API_ORIGIN:-}" != "https://s4.sodanoconsulting.it" || "${MOBILE_LOCAL_TEST:-}" != "false" ]]; then
+            echo "TestFlight richiede il server pubblico di ClickSocial e il collaudo locale disattivato."
+            exit 1
+          fi
+          for variable in APP_STORE_CONNECT_PRIVATE_KEY APP_STORE_CONNECT_KEY_IDENTIFIER APP_STORE_CONNECT_ISSUER_ID; do
             if [ -z "${!variable:-}" ]; then
               echo "Variabile Codemagic mancante: $variable. Consulta MOBILE.md."
               exit 1

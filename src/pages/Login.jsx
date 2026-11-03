@@ -1,5 +1,5 @@
 import { useAuth } from '@/lib/AuthContext';
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/api/client";
 import { Button } from "@/components/ui/button";
@@ -9,12 +9,14 @@ import { Mail, Lock, Loader2 } from "lucide-react";
 import SplitAuth from "@/components/auth/SplitAuth";
 import GoogleIcon from "@/components/GoogleIcon";
 import { safeReturnTo } from "@/lib/authReturnTo";
+import { isNativeIOS } from "@/lib/mobile";
 
 export default function Login() {
   const { appPublicSettings } = useAuth();
   const localSettings = appPublicSettings?.public_settings || {};
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const passwordRef = useRef(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   // Post-login destination (e.g. the MCP OAuth consent page sends users here
@@ -96,8 +98,17 @@ export default function Login() {
             <Input
               id="email"
               type="email"
-              autoComplete="email"
-              autoFocus
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
+              autoFocus={!isNativeIOS}
+              enterKeyHint={isNativeIOS ? "next" : undefined}
+              onKeyDown={(event) => {
+                if (isNativeIOS && event.key === "Enter" && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  passwordRef.current?.focus();
+                }
+              }}
               placeholder="nome@esempio.it"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -117,8 +128,10 @@ export default function Login() {
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
             <Input
               id="password"
+              ref={passwordRef}
               type="password"
               autoComplete="current-password"
+              enterKeyHint="go"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

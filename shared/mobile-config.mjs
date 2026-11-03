@@ -17,6 +17,15 @@ export function mobileOrigin(value, localTest = false) {
   return url.origin;
 }
 
+export function nativeJsonTimeouts(platform, path) {
+  if (platform === 'ios' && path === '/functions/generateCopy') {
+    /** Su iOS Capacitor usa connectTimeout anche in lettura. La generazione può attendere fino a tre chiamate consecutive da due minuti. */
+    const generationTimeout = 7 * 60 * 1000;
+    return { connectTimeout: generationTimeout, readTimeout: generationTimeout };
+  }
+  return { connectTimeout: 15000, readTimeout: 180000 };
+}
+
 export function privateFilePath(value, origin) {
   let url;
   try { url = new URL(value, origin); } catch { return null; }

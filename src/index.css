@@ -243,6 +243,18 @@
   }
 }
 
+.auth-screen { min-height: 100vh; min-height: 100dvh; }
+.auth-form-panel input { scroll-margin-block: 1rem 4.5rem; }
+@media (max-width: 1023px) {
+  .auth-screen { height: 100vh; height: 100dvh; grid-template-rows: minmax(0, 1fr); }
+  .auth-form-panel {
+    min-height: 0;
+    overflow-y: auto;
+    padding-block: max(1.5rem, env(safe-area-inset-top)) max(1.5rem, env(safe-area-inset-bottom));
+    padding-inline: max(clamp(1.25rem, 5vw, 2.5rem), env(safe-area-inset-left)) max(clamp(1.25rem, 5vw, 2.5rem), env(safe-area-inset-right));
+  }
+}
+
 /** La centratura desktop non deve spostare gli avvisi fuori dallo schermo sui telefoni. */
 @media (max-width: 600px) {
   .app-notifications[data-sonner-toaster][data-x-position='center'] { left: 16px; right: 16px; width: auto; transform: none; transition: none; }

@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createApp } from '../server/app.mjs';
 import { testDatabase } from './helpers/database.mjs';
-import { mobileOrigin, isPrivateAddress, privateFilePath } from '../shared/mobile-config.mjs';
+import { mobileOrigin, isPrivateAddress, nativeJsonTimeouts, privateFilePath } from '../shared/mobile-config.mjs';
 import { mobileRequestPolicy } from '../server/mobile-access.mjs';
 import { restoreStudioDraft, draftStorageKey } from '../src/lib/studioDraft.mjs';
 
@@ -17,6 +17,15 @@ test('indirizzi di collaudo espliciti, senza credenziali o server HTTP pubblici'
   assert.equal(isPrivateAddress('172.32.0.1'), false);
   assert.equal(isPrivateAddress('192.168.1.999'), false);
   assert.equal(privateFilePath('https://other.test/api/files/11111111-1111-1111-1111-111111111111', 'https://api.example.test'), null);
+});
+
+test('Genera su iPhone concede tempo alle tre fasi anche quando Capacitor dà precedenza a connectTimeout', () => {
+  const ios = nativeJsonTimeouts('ios', '/functions/generateCopy');
+  assert.ok(ios.connectTimeout > 3 * 120000);
+  assert.equal(ios.connectTimeout, ios.readTimeout);
+  const ordinary = { connectTimeout: 15000, readTimeout: 180000 };
+  assert.deepEqual(nativeJsonTimeouts('ios', '/auth/login'), ordinary);
+  assert.deepEqual(nativeJsonTimeouts('android', '/functions/generateCopy'), ordinary);
 });
 
 test('bozze isolate per utente e server, filtri conservati anche agli estremi', () => {

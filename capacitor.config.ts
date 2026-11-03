@@ -7,7 +7,7 @@ const config: CapacitorConfig = {
   server: { hostname: 'localhost', androidScheme: 'https' },
   android: { allowMixedContent: false },
   plugins: {
-    Keyboard: { resize: 'body', resizeOnFullScreen: true },
+    Keyboard: { resize: 'native', resizeOnFullScreen: true },
   },
 };
 export default config;

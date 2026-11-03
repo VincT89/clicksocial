@@ -1,6 +1,6 @@
 # ClickSocial su iPhone con Codemagic
 
-Il workflow `ios-testflight` è predisposto nel progetto. La compilazione firmata non è ancora stata eseguita: prima vanno completati gli account Apple e Codemagic. L’obiettivo iniziale è installare l’app con TestFlight per provarla sulla stessa rete Wi-Fi del PC.
+Il workflow `ios-testflight` prepara una build firmata per iPhone. L’app installata da TestFlight usa il backend Plesk all’indirizzo `https://s4.sodanoconsulting.it`.
 
 ## Registrare ClickSocial su Apple
 
@@ -22,17 +22,15 @@ Le chiavi e le password vanno inserite solo nei servizi indicati: non inviarle i
 
 ## Variabili della compilazione
 
-Nelle Environment variables dell’app Codemagic configura questi gruppi, usando esattamente i nomi riportati.
+Per TestFlight configura il gruppo seguente nelle Environment variables dell’app Codemagic.
 
 | Gruppo | Variabile | Valore |
 | --- | --- | --- |
-| `clicksocial_local` | `MOBILE_API_ORIGIN` | URL LAN mostrato da AVVIA-MOBILE.cmd sul PC, comprensivo di porta |
-| `clicksocial_local` | `MOBILE_LOCAL_TEST` | `true` |
 | `clicksocial_apple` | `APP_STORE_CONNECT_PRIVATE_KEY` | Contenuto completo del .p8, con intestazione e righe originali; attiva Secret |
 | `clicksocial_apple` | `APP_STORE_CONNECT_KEY_IDENTIFIER` | Key ID della stessa chiave; attiva Secret |
 | `clicksocial_apple` | `APP_STORE_CONNECT_ISSUER_ID` | Issuer ID corrispondente; attiva Secret |
 
-L’ultimo target locale usato nel progetto era `http://192.168.1.6:5181`: verifica che sia ancora l’indirizzo mostrato all’avvio, prima di copiarlo. Queste sono impostazioni di Codemagic; il file .env del backend e le chiavi AI non vanno caricati nel servizio di compilazione. L’accesso Apple viene utilizzato per il caricamento del pacchetto tramite le variabili protette. [Pubblicazione con Codemagic](https://docs.codemagic.io/yaml-publishing/app-store-connect/).
+Il workflow TestFlight imposta direttamente il dominio pubblico e `MOBILE_LOCAL_TEST=false`. Il gruppo `clicksocial_local` serve ai workflow Android e simulatore per il collaudo sul PC. Le chiavi AI restano sul backend. [Pubblicazione con Codemagic](https://docs.codemagic.io/yaml-publishing/app-store-connect/).
 
 ## Portare la versione aggiornata su GitHub
 
@@ -48,12 +46,12 @@ Il pacchetto .ipa compare negli artifacts, sotto `work/mobile-builds/ios/`. Vien
 
 Il numero della build aumenta con il contatore Codemagic. Usa una compilazione alla volta per questa app. Se esistono già build caricate da un’altra procedura, confronta i numeri prima del primo invio: il nuovo numero deve essere maggiore di quelli già utilizzati nella versione corrente. Non azzerare il contatore del workflow durante i test. [Numerazione delle build](https://docs.codemagic.io/yaml-quick-start/building-an-ionic-app/#build-versioning).
 
-Per usare l’app, avvia AVVIA-MOBILE.cmd sul PC e collega l’iPhone alla stessa rete Wi-Fi. Consenti a ClickSocial l’accesso alla rete locale quando iOS lo chiede. Codemagic e TestFlight non ospitano il backend. Finché si usa questo target, il capo potrà provarla solo raggiungendo lo stesso PC sulla rete locale; l’uso da altre reti richiede il futuro backend raggiungibile.
+Nel log di **Prepara progetto iOS** verifica che compaiano il dominio `https://s4.sodanoconsulting.it` e `Collaudo locale: no`. Con il backend attivo su Plesk, l’iPhone può usare Wi-Fi o rete mobile anche a PC spento.
 
 ## Cosa è stato verificato
 
-Durante il collaudo del 12 settembre la build 1.0 (5) è stata compilata, caricata su App Store Connect e aggiunta al gruppo interno TestFlight. Questo risultato riguarda quella build: il codice successivo, i collegamenti social e il nuovo target HTTPS richiedono una nuova compilazione e prove reali. La preparazione Plesk del 28 ottobre aggiorna il Node dei workflow a 24.22.1; non ha avviato una build su Codemagic.
+Le build 1.0 (5) e 1.0 (10) sono state caricate su App Store Connect. La build 10 è stata preparata con il collaudo locale attivo. Il cambio di server e le correzioni successive richiedono una nuova build e una prova sull’iPhone.
 
 ## Usare il backend Plesk
 
-Segui prima [PLESK.md](PLESK.md) e verifica il sito dal telefono. Imposta `MOBILE_API_ORIGIN=https://SOTTODOMINIO_REALE` e `MOBILE_LOCAL_TEST=false` nel gruppo del workflow, sostituendo il segnaposto con l’indirizzo confermato. Le chiavi del backend restano esclusivamente sul server. Ricompila dal commit aggiornato e installa la nuova build TestFlight; quella precedente continua a usare l’indirizzo incorporato in fase di compilazione. Prova accesso, file privati, generazione e ritorno dal consenso social anche fuori dalla rete Wi-Fi del PC.
+Verifica che il sito risponda dal telefono, poi installa la build TestFlight compilata dal commit aggiornato. Prova accesso, file privati, generazione e ritorno dal consenso social anche fuori dalla rete del PC. [Guida Plesk](PLESK.md).

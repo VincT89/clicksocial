@@ -161,10 +161,10 @@ TikTok richiede anche la verifica del dominio/prefisso delle immagini secondo il
 
 ## Passare l’iPhone al server
 
-Dopo il collaudo web, imposta nelle variabili del workflow Codemagic:
+Dopo il collaudo web, verifica nel log di preparazione iOS che il workflow TestFlight abbia usato i valori definiti in `codemagic.yaml`.
 
 ```text
-MOBILE_API_ORIGIN=https://SOTTODOMINIO_REALE
+MOBILE_API_ORIGIN=https://s4.sodanoconsulting.it
 MOBILE_LOCAL_TEST=false
 ```
 

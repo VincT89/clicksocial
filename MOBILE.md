@@ -1,6 +1,6 @@
 # ClickSocial con Capacitor
 
-L’app mobile usa la stessa interfaccia e le stesse API del sito. Nome: ClickSocial. Identificativo Android e iOS: it.sodanoconsulting.clicksocial. Il backend, il database e le chiavi dei servizi restano sul computer o sul futuro server.
+L’app mobile usa la stessa interfaccia e le stesse API del sito. L’identificativo Android e iOS di ClickSocial è `it.sodanoconsulting.clicksocial`. Per TestFlight il backend, il database e le chiavi dei servizi si trovano su Plesk. Nel collaudo Wi-Fi l’app usa invece il backend del PC.
 
 ## Collaudo sulla rete locale
 
@@ -34,12 +34,12 @@ Per usare sul telefono le modifiche all’interfaccia, ai template o ai font inc
 
 codemagic.yaml contiene tre workflow: android-local per l’APK, ios-simulator per il simulatore e ios-testflight per compilare e firmare un pacchetto iPhone da caricare su App Store Connect. Quest’ultimo richiede i certificati e il profilo App Store in Code signing identities, oltre alle variabili protette del gruppo clicksocial_apple. Parte manualmente soltanto da main_vincenzo e non invia l’app alla revisione pubblica o beta esterna. Il numero della build deriva dal contatore Codemagic; va confrontato con eventuali build preesistenti prima del primo invio.
 
-La procedura completa per account, firma e installazione è in [IOS-CODEMAGIC.md](IOS-CODEMAGIC.md). Nel gruppo Codemagic clicksocial_local vanno configurati MOBILE_API_ORIGIN e MOBILE_LOCAL_TEST=true per il collaudo sulla rete locale. L’URL deve essere raggiungibile dal dispositivo durante l’uso dell’app; il servizio di compilazione non ospita il backend.
+Il gruppo Codemagic `clicksocial_local` configura il collaudo Wi-Fi per Android e simulatore. Il workflow TestFlight usa direttamente `https://s4.sodanoconsulting.it` con `MOBILE_LOCAL_TEST=false`. [Guida a firma e installazione](IOS-CODEMAGIC.md).
 
 Il progetto iOS viene sincronizzato anche da Windows. La compilazione con Xcode richiede macOS, disponibile nei workflow Codemagic iOS. Il pacchetto per simulatore non si installa su un iPhone fisico. Durante il collaudo del 12 settembre è stata caricata la build 1.0 (5) su TestFlight; le modifiche successive e il passaggio al server pubblico richiedono una nuova build.
 
-Mantieni .env, database, uploads e chiavi di firma fuori da Git. Le eccezioni HTTP sono generate soltanto per il target di collaudo locale; il futuro server pubblico richiederà un target HTTPS.
+Mantieni .env, database, uploads e chiavi di firma fuori da Git. Le eccezioni HTTP sono generate soltanto per il collaudo locale. TestFlight usa HTTPS.
 
 ## Passaggio al sottodominio pubblico
 
-Completa prima caricamento e collaudo web secondo [PLESK.md](PLESK.md). Poi configura `MOBILE_API_ORIGIN` con l’URL HTTPS reale e `MOBILE_LOCAL_TEST=false` nel workflow Codemagic. Controlla che la compilazione legga il commit aggiornato, ricompila e installa la nuova build. Non aggiungere chiavi AI, SMTP o dei social al frontend o alle variabili `VITE_*`. Il PC può rimanere spento quando backend, database e file sono effettivamente sul server e l’app punta a quel server.
+Verifica il sito dal telefono e avvia il workflow TestFlight dal commit aggiornato di `main_vincenzo`. Prima di installare la nuova build controlla nel log il dominio Plesk e `Collaudo locale: no`. Le chiavi AI, SMTP e social restano sul server. [Guida Plesk](PLESK.md).

@@ -6,9 +6,10 @@ import { Browser } from '@capacitor/browser';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { FileTransfer } from '@capacitor/file-transfer';
 import { Share } from '@capacitor/share';
-import { mobileOrigin, privateFilePath } from '../../shared/mobile-config.mjs';
+import { mobileOrigin, nativeJsonTimeouts, privateFilePath } from '../../shared/mobile-config.mjs';
 
 export const isNative = Capacitor.isNativePlatform();
+export const isNativeIOS = Capacitor.getPlatform() === 'ios';
 const configuredOrigin = import.meta.env.VITE_MOBILE_API_ORIGIN || '';
 const localTest = import.meta.env.VITE_MOBILE_LOCAL_TEST === 'true';
 export const apiOrigin = isNative ? mobileOrigin(configuredOrigin, localTest) : window.location.origin;
@@ -48,7 +49,7 @@ export async function nativeJson(path, options = {}) {
   const result = await CapacitorHttp.request({
     url: apiUrl('/api' + path), method: options.method || 'GET', headers: await nativeHeaders(options.headers),
     ...(options.body !== undefined ? { data: JSON.parse(options.body) } : {}),
-    responseType: 'json', connectTimeout: 15000, readTimeout: 180000, disableRedirects: true,
+    responseType: 'json', ...nativeJsonTimeouts(Capacitor.getPlatform(), path), disableRedirects: true,
   }).catch(() => { throw new Error(localTest ? 'Non riesco a raggiungere ClickSocial. Verifica che il PC sia acceso, che il collegamento mobile sia avviato e che il telefono usi lo stesso Wi-Fi.' : 'Non riesco a raggiungere il server di ClickSocial. Controlla la connessione Internet e riprova. Se il problema continua, contatta il gestore.'); });
   if (result.status < 200 || result.status >= 300) throw responseError(result.status, result.data);
   return result.data;

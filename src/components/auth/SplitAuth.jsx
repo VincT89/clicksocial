@@ -1,6 +1,8 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { Keyboard } from "@capacitor/keyboard";
+import { isNativeIOS } from "@/lib/mobile";
 import Logo from "@/components/Logo";
 import { PhoneMockup } from "@/components/landing/HeroStage";
 
@@ -17,8 +19,32 @@ const THEMES = {
 };
 
 export default function SplitAuth({ theme = "purple", label, title, text, children, footer = null }) {
+  const panelRef = useRef(null);
+  useEffect(() => {
+    if (!isNativeIOS) return;
+    const panel = panelRef.current;
+    let frame;
+    const revealField = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const field = document.activeElement;
+        if (field instanceof HTMLInputElement && panel.contains(field)) {
+          field.scrollIntoView({ block: "nearest", inline: "nearest" });
+        }
+      });
+    };
+    const keyboard = Keyboard.addListener("keyboardDidShow", revealField);
+    panel.addEventListener("focusin", revealField);
+    window.addEventListener("resize", revealField);
+    return () => {
+      cancelAnimationFrame(frame);
+      panel.removeEventListener("focusin", revealField);
+      window.removeEventListener("resize", revealField);
+      keyboard.then(listener => listener.remove());
+    };
+  }, []);
   return (
-    <div className="min-h-screen bg-background grid lg:grid-cols-2">
+    <div className="auth-screen bg-background grid lg:grid-cols-2">
       <section
         aria-label="ClickSocial"
         className={`relative hidden lg:flex flex-col justify-between overflow-hidden p-10 ${THEMES[theme].panel}`}
@@ -44,8 +70,8 @@ export default function SplitAuth({ theme = "purple", label, title, text, childr
         </div>
       </section>
 
-      <section className="flex flex-col justify-center px-5 sm:px-10 lg:px-16 py-10 min-h-screen safe-top safe-bottom">
-        <div className="w-full max-w-md mx-auto">
+      <section ref={panelRef} className="auth-form-panel flex flex-col px-5 sm:px-10 lg:px-16 py-10">
+        <div className="w-full max-w-md shrink-0 m-auto">
           <Link
             to="/"
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-8"

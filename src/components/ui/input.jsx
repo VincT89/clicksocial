@@ -34,6 +34,9 @@ const Input = React.forwardRef(/** @param {React.InputHTMLAttributes<HTMLInputEl
         aria-controls={inputId}
         title={toggleLabel}
         disabled={props.disabled}
+        onPointerDown={event => {
+          if (document.activeElement?.id === inputId) event.preventDefault()
+        }}
         onClick={() => setPasswordVisible(visible => !visible)}
         className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
       >
