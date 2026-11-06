@@ -50,8 +50,8 @@ async function drawPhoto(canvas, source, filters, headline) {
   }
 }
 
-const PhotoEditor = forwardRef(/** @param {{imageUrl:string,headline?:string,subtitle?:string,design?:any,filters:any,disabled?:boolean,onDesignChange?:Function,selectedElement?:string,onSelectElement?:Function,elementLayout?:any,onLayoutChange?:Function,onWarningChange?:Function}} props */ function PhotoEditor(
-  { imageUrl, headline, subtitle = '', design = null, filters, disabled = false, onDesignChange, selectedElement, onSelectElement, elementLayout = {}, onLayoutChange, onWarningChange },
+const PhotoEditor = forwardRef(/** @param {{imageUrl:string,headline?:string,subtitle?:string,design?:any,filters:any,disabled?:boolean,onDesignChange?:Function,selectedElement?:string,onSelectElement?:Function,elementLayout?:any,onLayoutChange?:Function,onWarningChange?:Function,children?:React.ReactNode}} props */ function PhotoEditor(
+  { imageUrl, headline, subtitle = '', design = null, filters, disabled = false, onDesignChange, selectedElement, onSelectElement, elementLayout = {}, onLayoutChange, onWarningChange, children },
   ref
 ) {
   useI18n();
@@ -69,10 +69,13 @@ const PhotoEditor = forwardRef(/** @param {{imageUrl:string,headline?:string,sub
   const [loaded, setLoaded] = useState(null);
   const [imageError, setImageError] = useState("");
   const viewportRef = useRef(null);
+  const footerRef = useRef(null);
   const viewport = useSize(viewportRef);
+  const footer = useSize(footerRef);
   const source = loaded?.url === imageUrl ? loaded.image : null;
   const ratio = design ? FORMATS[design.format].width / FORMATS[design.format].height : source ? source.naturalWidth / source.naturalHeight : 1;
-  const width = Math.max(0, Math.min(viewport?.width || 0, (viewport?.height || 0) * ratio));
+  /** In orizzontale misuriamo lo spazio per la composizione intera e i suoi comandi. In verticale la scheda segue la larghezza del telefono. */
+  const fitWidth = viewport ? Math.min(viewport.width, Math.max(190, (viewport.height - (footer?.height || 44) - 2) * ratio + 2)) : null;
   useEffect(() => {
     let active = true;
     setImageError("");
@@ -143,9 +146,9 @@ const PhotoEditor = forwardRef(/** @param {{imageUrl:string,headline?:string,sub
     getFilters: () => filters,
   }));
 
-  return <Dialog.Root><div data-tour="studio-editor" className="studio-editor" aria-busy={rendering || exporting || !source}>
-    <div ref={viewportRef} className="studio-preview-viewport" style={{ aspectRatio:ratio }}>
-      <div className="studio-preview-frame" style={{ width, height: width / ratio }}>
+  return <Dialog.Root><div ref={viewportRef} data-tour="studio-editor" className="studio-editor" aria-busy={rendering || exporting || !source}>
+    <div className="studio-photo-card" style={/** @type {React.CSSProperties} */ ({ '--studio-fit-width':fitWidth ? fitWidth + 'px' : '100%' })}>
+      <div className="studio-preview-frame" style={{ aspectRatio:ratio }}>
         <Dialog.Trigger asChild>
           <button type="button" className="studio-preview-open" aria-label={translateUI("Apri anteprima a tutto schermo")}
             disabled={!source || !!imageError || rendering || exporting} onClick={() => onSelectElement?.('')}>
@@ -156,9 +159,12 @@ const PhotoEditor = forwardRef(/** @param {{imageUrl:string,headline?:string,sub
         {!source && <p role={imageError ? 'alert' : 'status'} className="absolute inset-0 flex items-center justify-center p-4 text-sm text-muted-foreground text-center">{imageError || translateUI("Caricamento dell’anteprima…")}</p>}
         {source && design && !imageError && <ElementOverlay design={design} onChange={onDesignChange} layout={elementLayout} selected={selectedElement} onSelect={onSelectElement} disabled={disabled || exporting} />}
       </div>
+      <div ref={footerRef}>
+        {source && imageError && <p role="alert" className="studio-preview-warning">{imageError}</p>}
+        {exporting && <p role="status" className="text-xs text-muted-foreground">{translateUI("Esportazione foto…")}</p>}
+        {children}
+      </div>
     </div>
-    {source && imageError && <p role="alert" className="studio-preview-warning">{imageError}</p>}
-    {exporting && <p role="status" className="text-xs text-muted-foreground">{translateUI("Esportazione foto…")}</p>}
   </div>
     <Dialog.Portal>
       <Dialog.Overlay className="studio-drawer-overlay" />

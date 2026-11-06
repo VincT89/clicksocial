@@ -16,6 +16,7 @@ import ConfirmAction from '@/components/ConfirmAction';
 import { toast } from 'sonner';
 import WorkspaceHeader from '@/components/WorkspaceHeader';
 import { dayKey, moveMonth, editorialDate, editorialStage, scheduledTime, STAGES, PLATFORMS } from '@/lib/editorialDates.mjs';
+import { postChannels } from '../../shared/publish-channels.mjs';
 
 const stageFilters = { programmato:'Programmato', ...STAGES };
 
@@ -69,7 +70,7 @@ export default function Library({ calendar = false }) {
   const filtered = useMemo(() => {
     const term = search.trim().toLocaleLowerCase('it-IT');
     const result = (posts || []).filter(post => {
-      if (platform && post.platform !== platform) return false;
+      if (platform && !postChannels(post).includes(platform)) return false;
       const matchesStage = stage === 'programmato' ? Number.isFinite(scheduledTime(post)) : editorialStage(post) === stage;
       if (stage && !matchesStage) return false;
       const fields = [post.title, post.headline, post.caption, post.hashtags, post.editorial_notes, post.planning?.topic,

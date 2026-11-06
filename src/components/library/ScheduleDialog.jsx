@@ -14,8 +14,14 @@ import { Image } from '@/components/ui/image';
 import { prepareSocialPhoto } from '@/lib/socialPhoto';
 import { PLATFORMS } from '@/lib/editorialDates.mjs';
 import { isNative, openExternal } from '@/lib/mobile';
+import DualPublishDialog from './DualPublishDialog';
+import { postChannels } from '../../../shared/publish-channels.mjs';
 
-export default function ScheduleDialog({ post, open, onOpenChange, onScheduled }) {
+export default function ScheduleDialog(props) {
+  return postChannels(props.post).length === 2 ? <DualPublishDialog key={props.post.id} {...props} /> : <SinglePublishDialog {...props} />;
+}
+
+function SinglePublishDialog({ post, open, onOpenChange, onScheduled }) {
   useI18n();
   const sending = useRef(false);
   const [state, setState] = useState(null);

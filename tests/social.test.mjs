@@ -386,6 +386,44 @@ test('scollega solo il social scelto e conserva il calendario e gli altri provid
   assert.deepEqual(Object.keys(await readConnections(f.app.db,f.app.config,f.user.id)),['instagram']);
 });
 
+test('Instagram e Facebook: conferma atomica, esiti indipendenti e riprova del solo invio fallito', async t => {
+  const f = await fixture(t, { useProjectEnv:false });
+  await f.link('instagram'); await f.link('facebook');
+  const post = await f.post('instagram');
+  const draft = { ...await f.getPost(post.id), publish_channels:['instagram','facebook'] };
+  await f.app.db.prepare('UPDATE posts SET data=? WHERE id=?').run(JSON.stringify(draft), post.id);
+  const targets = [{ platform:'instagram', account_id:'ig1' }, { platform:'facebook', account_id:'page1' }];
+  const body = { post_id:post.id, confirmed:true, request_id:randomUUID(), caption:'Due canali', destinations:targets };
+  await assert.rejects(f.publication.enqueue(f.other, body), /Post non trovato/);
+  await assert.rejects(f.publication.enqueue(f.user, { ...body, destinations:[targets[0],targets[0]] }), /destinazioni/);
+  await assert.rejects(f.publication.enqueue(f.user, { ...body, destinations:[targets[0],{ ...targets[1], account_id:'estraneo' }] }), /account/);
+  assert.equal((await f.getPost(post.id)).status, 'pronto');
+  assert.equal((await f.app.db.prepare('SELECT COUNT(*) AS n FROM posts').get()).n, 1);
+  const future = new Date(Date.now() + 3600000).toISOString();
+  await Promise.all([1,2].map(() => f.publication.enqueue(f.user, { ...body, scheduled_at:future })));
+  await assert.rejects(f.publication.enqueue(f.user, { ...body, caption:'Cambio dopo la conferma', scheduled_at:future }), /già stato confermato/);
+  const deliveries = await f.app.db.prepare('SELECT id,data FROM posts WHERE user_id=?').all(f.user.id);
+  assert.equal(deliveries.length, 2);
+  for (const row of deliveries) {
+    const data = JSON.parse(row.data);
+    assert.equal(data.publication_group, post.id); assert.deepEqual(data.publish_channels, [data.platform]);
+    assert.equal(data.scheduled_at, future);
+    await f.app.db.prepare('UPDATE posts SET data=? WHERE id=?').run(JSON.stringify({ ...data, scheduled_at:new Date(0).toISOString() }), row.id);
+  }
+  const facebook = deliveries.find(row => JSON.parse(row.data).platform === 'facebook').id;
+  f.control.before = url => url.pathname.endsWith('/photos') ? Response.json({ error:{ code:100, message:'Rifiutato per collaudo' } }, { status:400 }) : null;
+  await f.publication.publishDuePosts();
+  assert.equal((await f.getPost(post.id)).status, 'pubblicato'); assert.equal((await f.getPost(facebook)).status, 'fallito');
+  f.control.before = null;
+  await f.publication.enqueue(f.user, { post_id:facebook, account_id:'page1', caption:'Due canali', confirmed:true });
+  await f.publication.publishDuePosts();
+  assert.equal((await f.getPost(facebook)).status, 'pubblicato');
+  assert.equal(f.seen.filter(call => call.url.pathname.endsWith('/media_publish')).length, 1);
+  assert.equal(f.seen.filter(call => call.url.pathname.endsWith('/photos')).length, 2);
+  await f.publication.enqueue(f.user, { ...body, scheduled_at:future });
+  assert.equal((await f.app.db.prepare('SELECT COUNT(*) AS n FROM posts').get()).n, 2);
+});
+
 test('validazione formato, consenso TikTok e link mobile senza credenziali',()=>{
   validateSocialImage({mime:'image/jpeg',bytes:jpeg},'instagram');
   assert.throws(()=>validateSocialImage({mime:'image/png',bytes:jpeg},'instagram'));

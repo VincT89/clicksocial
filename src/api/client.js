@@ -63,7 +63,7 @@ export const api = {
     flow: id => request('/social/flows/' + encodeURIComponent(id)),
     confirm: (id, account_ids) => send('/social/flows/' + encodeURIComponent(id) + '/confirm', { account_ids }),
     cancel: id => send('/social/flows/' + encodeURIComponent(id) + '/cancel'),
-    prepare: id => request('/social/posts/' + encodeURIComponent(id) + '/prepare'),
+    prepare: (id, platform = '') => request('/social/posts/' + encodeURIComponent(id) + '/prepare' + (platform ? '?platform=' + encodeURIComponent(platform) : '')),
     publish: data => send('/social/publish', data),
     resolve: (id, outcome) => send('/social/posts/' + encodeURIComponent(id) + '/resolve', { checked: true, outcome }),
   },

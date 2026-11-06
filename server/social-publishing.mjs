@@ -1,6 +1,7 @@
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { digest, fail, now, transaction } from './store.mjs';
 import { ownedImage } from './files.mjs';
+import { postChannels, validChannels } from '../shared/publish-channels.mjs';
 import { jsonBody, socialAccounts, socialProvider, readConnections } from './social-connections.mjs';
 
 function jpegSize(bytes) {
@@ -49,40 +50,76 @@ export function createSocialPublishing(db, config, social) {
     if (file.user_id !== user.id) fail(404, 'Immagine non trovata.');
     return file;
   }
-  async function prepare(user, id) {
+  async function prepare(user, id, requestedPlatform = null) {
     if (user.plan !== 'pro') fail(402, 'L’invio automatico ai social è incluso nel piano Pro.', 'pro_required');
     const { data } = await postFor(user, id);
     if (!data.image_url) fail(409, 'Completa e salva prima il post nello Studio.');
     if (['in_pubblicazione', 'pubblicato', 'da_verificare'].includes(data.status)) fail(409, 'Questo post è già in invio, pubblicato o da verificare.');
-    social.requireConfig(data.platform);
-    const verified = await social.verify(user, data.platform);
-    return { accounts: verified.accounts, creator: verified.creator, platform: data.platform };
+    const platform = requestedPlatform || data.platform;
+    if (requestedPlatform && !postChannels(data).includes(platform)) fail(400, 'Il canale non è selezionato per questo post.');
+    social.requireConfig(platform);
+    const verified = await social.verify(user, platform);
+    return { accounts:verified.accounts, creator:verified.creator, platform };
   }
+
   async function enqueue(user, body) {
     if (body.confirmed !== true) fail(400, 'Conferma il contenuto e l’account prima di inviare.');
-    const checked = await prepare(user, body.post_id);
-    if (!checked.accounts.some(account => account.id === body.account_id)) fail(400, 'Seleziona un account collegato e autorizzato.');
+    const initial = await postFor(user, body.post_id);
+    const dual = body.destinations !== undefined;
+    if (dual && (typeof body.request_id !== 'string' || !/^[a-f0-9-]{36}$/.test(body.request_id))) fail(400, 'Conferma nuovamente le destinazioni.');
+    const targets = dual ? body.destinations : [{ platform:initial.data.platform, account_id:body.account_id, image_url:body.image_url }];
+    if (dual && (!Array.isArray(targets) || targets.length !== 2 || !validChannels(targets.map(target => target?.platform)))) fail(400,'Conferma entrambe le destinazioni selezionate.');
+    const confirmation = dual && digest(config, JSON.stringify([body.caption, body.scheduled_at || null,
+      [...targets].sort((a,b) => a.platform.localeCompare(b.platform)).map(item => [item.platform, item.account_id, item.image_url || null])]));
+    const repeated = data => {
+      if (!dual || data.publication_group !== body.post_id || data.publication_request !== body.request_id) return false;
+      if (data.publication_confirmation !== confirmation) fail(409,'L’invio è già stato confermato con altre impostazioni. Controlla i post salvati.');
+      return true;
+    };
+    if (repeated(initial.data)) return { ok:true, scheduled_at:initial.data.scheduled_at };
+    if (dual) {
+      const allowed = postChannels(initial.data);
+      if (!allowed.includes(initial.data.platform) || !targets.every(target => allowed.includes(target.platform))) fail(400,'Conferma entrambe le destinazioni selezionate.');
+      if (initial.data.publication_group || initial.data.status === 'in_coda') fail(409,'Questi invii hanno già una destinazione. Controlla i post salvati.');
+    } else if (initial.data.publish_channels && (initial.data.publish_channels.length !== 1 || initial.data.publish_channels[0] !== initial.data.platform)) {
+      fail(400,'Conferma i canali selezionati per questo post.');
+    }
     const when = body.scheduled_at ? new Date(body.scheduled_at) : new Date();
     if (!Number.isFinite(when.getTime()) || body.scheduled_at && when.getTime() <= Date.now()) fail(400, 'Scegli una data futura valida.');
-    const initial = await postFor(user, body.post_id);
-    const image = await ownImage(user, body.image_url || initial.data.image_url);
-    validateSocialImage(image, checked.platform);
     const caption = body.caption;
-    if (typeof caption !== 'string' || caption.length > ({ instagram: 2200, tiktok: 4000, facebook: 10000 })[checked.platform]) fail(400, 'Il testo supera il limite del social selezionato.');
-    const options = checked.platform === 'tiktok' ? validateTikTokOptions(body.options, checked.creator) : {};
-    if (checked.platform === 'tiktok' && initial.data.mode !== 'original' && !options.is_aigc) fail(400, 'Questa immagine usa l’AI: abilita l’etichetta TikTok per i contenuti AI.');
-    await transaction(db, async () => {
+    const jobs = [];
+    for (const target of targets) {
+      const checked = await prepare(user, initial.row.id, dual ? target.platform : null);
+      const account = checked.accounts.find(item => item.id === target.account_id);
+      if (!account) fail(400, 'Seleziona un account collegato e autorizzato.');
+      const image = await ownImage(user, target.image_url || initial.data.image_url);
+      validateSocialImage(image, checked.platform);
+      if (typeof caption !== 'string' || caption.length > ({ instagram:2200, tiktok:4000, facebook:10000 })[checked.platform]) fail(400, 'Il testo supera il limite del social selezionato.');
+      const options = checked.platform === 'tiktok' ? validateTikTokOptions(body.options, checked.creator) : {};
+      if (checked.platform === 'tiktok' && initial.data.mode !== 'original' && !options.is_aigc) fail(400, 'Questa immagine usa l’AI: abilita l’etichetta TikTok per i contenuti AI.');
+      jobs.push({ platform:checked.platform, job:{ version:1, attempt:randomUUID(), phase:'prepared', account_id:account.id, account_name:account.name, image_url:'/api/files/' + image.id, caption, options } });
+    }
+    /** Il primo invio usa la bozza esistente. Il secondo nasce nella stessa transazione e ha il proprio stato, anche in caso di riprova. */
+    return transaction(db, async () => {
       const { row, data } = await postFor(user, body.post_id);
-      if (row.data !== initial.row.data || data.platform !== checked.platform || ['in_pubblicazione', 'pubblicato', 'da_verificare'].includes(data.status)) fail(409, 'Il post è cambiato. Riapri la finestra di pubblicazione.');
-      // Impedisce che la disconnessione, eseguita durante la verifica remota, lasci un nuovo invio in coda.
-      const connected = (await readConnections(db, config, user.id))[data.platform];
-      if (!connected) fail(409, 'Il collegamento social è stato rimosso.');
-      if (!socialAccounts(data.platform, connected).some(account => account.id === body.account_id)) fail(409, 'Il collegamento social è cambiato. Seleziona di nuovo l’account.');
-      data.social_job = { version: 1, attempt: randomUUID(), phase: 'prepared', account_id: body.account_id, account_name: checked.accounts.find(a => a.id === body.account_id).name, image_url: '/api/files/' + image.id, caption, options };
-      Object.assign(data, { status: 'in_coda', scheduled_at: when.toISOString(), editorial_at: when.toISOString(), social_page_id: body.account_id, schedule_error: '' });
-      await db.prepare('UPDATE posts SET data=?,updated_at=? WHERE id=?').run(JSON.stringify(data), now(), row.id);
+      if (repeated(data)) return { ok:true, scheduled_at:data.scheduled_at };
+      if (row.data !== initial.row.data) fail(409, 'Il post è cambiato. Riapri la finestra di pubblicazione.');
+      const connections = await readConnections(db, config, user.id);
+      for (const { platform, job } of jobs) {
+        if (!connections[platform]) fail(409, 'Il collegamento social è stato rimosso.');
+        if (!socialAccounts(platform, connections[platform]).some(account => account.id === job.account_id)) fail(409, 'Il collegamento social è cambiato. Seleziona di nuovo l’account.');
+        const delivery = { ...data, platform, social_job:job, status:'in_coda', scheduled_at:when.toISOString(), editorial_at:when.toISOString(), social_page_id:job.account_id, schedule_error:'' };
+        if (dual) Object.assign(delivery, { publish_channels:[platform], publication_group:row.id, publication_request:body.request_id, publication_confirmation:confirmation });
+        if (platform === data.platform) {
+          const changed = await db.prepare('UPDATE posts SET data=?,updated_at=? WHERE id=? AND data=?').run(JSON.stringify(delivery), now(), row.id, row.data);
+          if (!changed.changes) fail(409, 'Il post è cambiato. Riapri la finestra di pubblicazione.');
+        } else {
+          const time = now();
+          await db.prepare('INSERT INTO posts (id,user_id,data,created_at,updated_at) VALUES (?,?,?,?,?)').run(randomUUID(), user.id, JSON.stringify(delivery), time, time);
+        }
+      }
+      return { ok:true, scheduled_at:when.toISOString() };
     });
-    return { ok: true, scheduled_at: when.toISOString() };
   }
   function mediaUrl(postId, job, userId) {
     const expires = Date.now() + 2 * 3600000;

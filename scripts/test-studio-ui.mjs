@@ -140,8 +140,17 @@ try {
     const dimensions = await page.evaluate(() => ({ width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth, scrollHeight: document.documentElement.scrollHeight }));
     assert.ok(dimensions.scrollWidth <= dimensions.width + 1, 'Larghezza della pagina: ' + JSON.stringify(viewport));
     assert.ok(dimensions.scrollHeight <= dimensions.height + 1, 'Altezza della pagina: ' + JSON.stringify(viewport));
-    const captionBox = await page.locator('#post-caption').boundingBox(), photoFrame = await page.locator('.studio-preview-frame').boundingBox();
+    await page.locator('#post-caption').scrollIntoViewIfNeeded();
+    const captionBox = await page.locator('#post-caption').boundingBox();
     assert.ok(captionBox.y >= 0 && captionBox.height >= 44 && captionBox.y + captionBox.height <= viewport.height, 'Descrizione del post salvato visibile: ' + JSON.stringify(viewport));
+    await page.getByRole('button', { name:'Personalizza il post' }).scrollIntoViewIfNeeded();
+    const photoFrame = await page.locator('.studio-preview-frame').boundingBox();
+    const card = await page.locator('.studio-photo-card').boundingBox();
+    assert.ok(Math.abs(photoFrame.width - (card.width - 2)) <= 1 && Math.abs(card.x + 1 - photoFrame.x) <= 1, 'La foto riempie la scheda fino al bordo');
+    if (viewport.width < 768 && viewport.height > viewport.width) {
+      const content = await page.locator('.studio-content').boundingBox();
+      assert.ok(Math.abs(card.width - content.width) <= 1, 'Su iPhone la scheda usa tutta la larghezza');
+    }
     assert.ok(photoFrame.width >= 100 && photoFrame.height >= 100, 'La foto rimane visibile: ' + JSON.stringify(viewport));
     const gear = await page.getByRole('button', { name: 'Personalizza il post' }).boundingBox();
     assert.ok(gear.x >= 0 && gear.y >= 0 && gear.y + gear.height <= viewport.height, 'Ingranaggio visibile');
@@ -358,11 +367,12 @@ try {
   assert.equal(await page.locator('.studio-settings-drawer').count(), 0);
   assert.equal(await page.locator('#post-context').isVisible(), false);
   assert.equal(await page.locator('.studio-request-text').innerText(), 'Racconta la sagra');
-  for (const selector of ['#post-caption', '[data-tour="studio-publish"]', '[data-tour="studio-save"]']) {
-    assert.ok(await page.locator(selector).evaluate(element => {
+  for (const selector of ['#post-caption', '.studio-channel', '[data-tour="studio-publish"]', '[data-tour="studio-save"]']) {
+    await page.locator(selector).first().scrollIntoViewIfNeeded();
+    assert.ok(await page.locator(selector).first().evaluate(element => {
       const box = element.getBoundingClientRect();
       return element.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
-    }), 'Subito dopo Genera, sullo schermo da 390 px: ' + selector);
+    }), 'Raggiungibile dopo Genera sullo schermo da 390 px: ' + selector);
   }
   await page.waitForFunction(() => !document.querySelector('[data-sonner-toast][data-visible="true"]'));
   const insetSession = await context.newCDPSession(page);
@@ -374,11 +384,13 @@ try {
     await insetSession.send('Emulation.setSafeAreaInsetsOverride', { insets });
     await settle();
     for (const target of ['studio-generate', 'studio-save', 'studio-publish', 'studio-settings']) {
+      await page.locator('[data-tour="' + target + '"]').scrollIntoViewIfNeeded();
       const area = await page.locator('[data-tour="' + target + '"]').boundingBox();
       assert.ok(area && area.x >= 0 && area.y >= 0 && area.x + area.width <= viewport.width + 1 && area.y + area.height <= viewport.height + 1, 'Azione visibile: ' + target + ' ' + JSON.stringify(viewport));
       assert.ok(await page.locator('[data-tour="' + target + '"]').evaluate(element => { const box = element.getBoundingClientRect(); return element.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)); }), 'Azione raggiungibile: ' + target + ' ' + JSON.stringify(viewport));
     }
     const frame = await page.locator('.studio-preview-frame').boundingBox(); assert.ok(frame.width >= 60 && frame.height >= 60, 'Foto visibile');
+    await page.locator('[data-tour="studio-publish"]').scrollIntoViewIfNeeded();
     const [caption, publish, save, revision, nav] = await Promise.all([
       page.locator('#post-caption').boundingBox(), page.locator('[data-tour="studio-publish"]').boundingBox(), page.locator('[data-tour="studio-save"]').boundingBox(),
       page.locator('.studio-revision').boundingBox(), page.locator('.mobile-bottom-nav').boundingBox(),
@@ -414,10 +426,20 @@ try {
   assert.equal(await caption.inputValue(), longCaption);
   await page.getByRole('button', { name: 'Leggi e modifica' }).tap(); await fullText.fill('Testo di collaudo\n\n#test');
   await captionDialog.getByRole('button', { name: 'Applica al post' }).tap();
-  for (const name of ['Facebook', 'Instagram']) {
-    await open('Testi e AI'); await page.getByRole('button', { name, exact: true }).click(); await close();
-    assert.equal(await page.getByLabel('Descrizione per ' + name, { exact: true }).inputValue(), 'Testo di collaudo\n\n#test');
-  }
+  const channels = page.getByRole('group', { name:'Pubblica su', exact:true });
+  const toggle = name => channels.locator('label').filter({ hasText:name }).click();
+  assert.ok(await channels.getByRole('switch', { name:'Instagram' }).isChecked());
+  await toggle('Facebook');
+  assert.equal(await page.getByLabel('Descrizione per Instagram e Facebook', { exact:true }).inputValue(), 'Testo di collaudo\n\n#test');
+  await open('Testi e AI');
+  const drawerChannels = page.getByRole('group', { name:'Dove vuoi pubblicare' });
+  assert.ok(await drawerChannels.getByRole('switch', { name:'Facebook' }).isChecked());
+  await drawerChannels.locator('label').filter({ hasText:'Instagram' }).click(); await close();
+  assert.ok(await channels.getByRole('switch', { name:'Facebook' }).isChecked());
+  assert.equal(await page.getByLabel('Descrizione per Facebook', { exact:true }).inputValue(), 'Testo di collaudo\n\n#test');
+  await toggle('Facebook'); assert.ok(await page.getByRole('button', { name:'Pubblica', exact:true }).isDisabled());
+  await toggle('Instagram');
+  assert.equal(await page.getByLabel('Descrizione per Instagram', { exact:true }).inputValue(), 'Testo di collaudo\n\n#test');
   await mainNav.getByRole('link', { name: 'Home', exact: true }).click();
   await page.getByRole('link', { name: 'Libreria media', exact: true }).click();
   await page.waitForURL('**/media');
@@ -582,8 +604,8 @@ try {
   const studioPhone = await phoneElement.contentFrame();
   await studioPhone.locator('.studio-editor[aria-busy="false"]').waitFor();
   await studioPhone.waitForFunction(() => {
-    const card = document.querySelector('.studio-preview-panel'), photo = document.querySelector('.studio-preview-frame');
-    return innerWidth === 393 && Math.abs(card.clientWidth - photo.getBoundingClientRect().width) < 2;
+    const card = document.querySelector('.studio-photo-card'), photo = document.querySelector('.studio-preview-frame');
+    return innerWidth === 393 && Math.abs(card.clientWidth - photo.getBoundingClientRect().width) < 1;
   });
   const phoneBrief = studioPhone.locator('#post-context');
   await phoneBrief.fill('Prova di rotazione');

@@ -31,6 +31,8 @@ import PhotoAdjustments from '@/components/studio/PhotoAdjustments';
 import StudioDrawer from '@/components/studio/StudioDrawer';
 import BrandSettings from '@/components/brand/BrandSettings';
 import '@/components/studio/Studio.css';
+import PublishChannels from '@/components/studio/PublishChannels';
+import { postChannels } from '../../shared/publish-channels.mjs';
 
 export default function Studio() {
   useI18n();
@@ -45,7 +47,7 @@ export default function Studio() {
   const generateLock = useRef(false);
   const requestId = useRef('');
   const {
-    originalUrl, setOriginalUrl, platform, setPlatform, tone: savedTone, setTone, mode, setMode,
+    originalUrl, setOriginalUrl, platform, setPlatform, publication, setPublication, tone: savedTone, setTone, mode, setMode,
     title, setTitle, context, setContext, generating, setGenerating, setGenerationStage, copy, setCopy,
     filters, setFilters, activePreset, setActivePreset, editingId, setEditingId,
     postStatus, setPostStatus, resetDraft, draftRevision,
@@ -80,6 +82,7 @@ export default function Studio() {
       if (!alive.current || requestId.current !== request) return;
       resetDraft();
       setEditingId(p.id); setOriginalUrl(p.original_image_url || p.image_url);
+      setPublication({ channels:postChannels(p), fixed:!!p.publication_group });
       setPlatform(p.platform || 'instagram'); setTone(p.tone || defaultTone(me)); setMode(p.mode || (p.planning && !p.image_url ? DEFAULT_MODE : 'original'));
       setTitle(p.title || ''); setContext(p.context || ''); setPostStatus(p.status === 'fallito' ? 'pronto' : p.status || 'pronto');
       setDesign(p.design || null); setPlanning(p.planning || null); setEditorialAt(p.editorial_at || null);
@@ -162,7 +165,7 @@ export default function Studio() {
       if (!exported) throw new Error('Impossibile esportare la foto.');
       const payload = { title:title.trim() || 'Senza titolo', image_url:exported, original_image_url:originalUrl,
         headline:copy?.headline || '', caption:copy?.caption || '', hashtags:copy?.hashtags || '', context:context || '',
-        platform:String(platform).toLowerCase(), tone, mode:copy?.graphic_url ? (design?.text_mode === 'image' ? 'graphic' : copy.generated_mode || mode) : mode, status:'bozza',
+        platform:String(platform).toLowerCase(), publish_channels:channels, tone, mode:copy?.graphic_url ? (design?.text_mode === 'image' ? 'graphic' : copy.generated_mode || mode) : mode, status:'bozza',
         graphic_url:copy?.graphic_url || '', graphic_subtitle:copy?.graphic_subtitle || '', ...(design ? { design } : {}), editor_filters:JSON.stringify(filters), editor_preset:activePreset || 'Originale' };
       const saved = editingId ? await api.entities.Post.update(editingId,payload) : await api.entities.Post.create(payload);
       if (draftRevision.current === revision) { setEditingId(saved.id); setPostStatus(saved.status || 'bozza'); }
@@ -198,6 +201,13 @@ export default function Studio() {
     <p className="text-xs text-muted-foreground">{translateUI("Queste informazioni guidano la generazione. Il post mantiene la bozza e la data prevista.")}</p>
   </section>;
   const controlsDisabled = saving || generating || loading || locked || assetBusy || !!publishPost || !!loadError;
+  const channels = publication?.channels ?? postChannels({ platform });
+  const changeChannels = next => {
+    if (publication?.fixed) return;
+    setPublication({ channels:next, fixed:false });
+    if (next.length && !next.includes(String(platform).toLowerCase())) setPlatform(next[0]);
+  };
+  const captionPlatform = channels.length === 2 ? translateUI('Instagram e Facebook') : PLATFORMS[channels[0]];
   const activeDesign = design || newPostDesign(me);
   /** Il testo provvisorio della pianificazione resta nella bozza, ma non indica che la foto sia già diventata un post. */
   const provisionalCopy = planning && !copy?.generated_mode && copy?.caption === planning.provisional_copy;
@@ -222,7 +232,7 @@ export default function Studio() {
   );
   const saveButtons = !locked && (
     <div className="studio-save-actions">
-      {hasContent && <Button data-tour="studio-publish" onClick={() => save('publish')} disabled={controlsDisabled || String(platform).toLowerCase() === 'tiktok'}>{translateUI("Pubblica")}</Button>}
+      {hasContent && <Button data-tour="studio-publish" onClick={() => save('publish')} disabled={controlsDisabled || !channels.length}>{translateUI("Pubblica")}</Button>}
       <Button data-tour="studio-save" onClick={() => save('draft')} variant="outline" disabled={controlsDisabled} aria-busy={saving}>
         {saving ? translateUI("Salvataggio…") : translateUI("Salva in bozze")}
       </Button>
@@ -234,7 +244,7 @@ export default function Studio() {
   } else if (!canGenerate) {
     generationNote = <>{translateUI("Hai utilizzato le generazioni gratuite.")} <Link className="underline" to="/profilo?section=plan">{translateUI("Apri il piano")}</Link></>;
   } else if (!hasContent) {
-    generationNote = translateUI('Prepariamo grafica, descrizione e hashtag per {platform}.', {platform:PLATFORMS[String(platform).toLowerCase()] || translateUI('il social')});
+    generationNote = translateUI('Prepariamo grafica, descrizione e hashtag per {platform}.', { platform:captionPlatform || translateUI('il social') });
   }
   const drawer = <StudioDrawer open={drawerOpen} onOpenChange={open => { if (!assetBusy) setDrawerOpen(open); }} tab={drawerTab} onTabChange={setDrawerTab} busy={assetBusy}>
     <fieldset disabled={controlsDisabled} className="space-y-5 min-w-0">
@@ -254,7 +264,7 @@ export default function Studio() {
         {design?.text_mode === 'image' ? <p className="text-sm text-muted-foreground">{translateUI("La grafica mantiene l’inquadratura completa per preservare le scritte. Per cambiarla, aggiorna le indicazioni e rigenera dalla foto originale.")}</p> : design && <fieldset className="space-y-3"><legend className="text-sm font-medium mb-2">{translateUI("Inquadratura della foto")}</legend>{[['x','Ritaglio orizzontale'],['y','Ritaglio verticale']].map(([key,label]) => <div key={key}><label htmlFor={'crop-'+key} className="text-sm">{translateUI(label)}</label><input id={'crop-'+key} type="range" min="0" max="1" step="0.01" value={design.crop[key]} onChange={event => changeDesign(current => ({ ...current, crop: { ...current.crop, [key]: Number(event.target.value) } }))} className="w-full h-11" /></div>)}</fieldset>}
         <PhotoAdjustments filters={filters} activePreset={activePreset} onFiltersChange={setFilters} onPresetChange={setActivePreset} disabled={controlsDisabled || !originalUrl} />
       </>}
-      {drawerTab === 'copy' && <div data-tour="studio-copy"><CopyPanel platform={platform} setPlatform={setPlatform} tone={tone} setTone={setTone} mode={mode} setMode={setMode} generating={generating} copy={copy} setCopy={setCopy} imageText={activeDesign.text_mode === 'image'} templateMode={!!design || !originalUrl} autoTextStyle={activeDesign.ai_text_style === true} onAutoTextStyleChange={enabled => changeDesign(current => ({ ...current, ai_text_style: enabled }))} /></div>}
+      {drawerTab === 'copy' && <div data-tour="studio-copy"><CopyPanel channels={channels} onChannelsChange={changeChannels} fixedChannel={publication?.fixed} tone={tone} setTone={setTone} mode={mode} setMode={setMode} generating={generating} copy={copy} setCopy={setCopy} imageText={activeDesign.text_mode === 'image'} templateMode={!!design || !originalUrl} autoTextStyle={activeDesign.ai_text_style === true} onAutoTextStyleChange={enabled => changeDesign(current => ({ ...current, ai_text_style: enabled }))} /></div>}
       {drawerTab === 'post' && <>
         <div data-tour="studio-title" className="space-y-2"><label htmlFor="post-title" className="text-sm font-medium">{translateUI("Titolo del post salvato")}</label><Input id="post-title" value={title} onChange={event => setTitle(event.target.value)} maxLength={200} placeholder={translateUI("Nome interno del contenuto")} /></div>
         <p className="text-sm text-muted-foreground">{translateUI("Salva in bozze conserva il post per dopo. Pubblica apre la conferma dell’account di destinazione.")}</p>
@@ -281,16 +291,17 @@ export default function Studio() {
             <PhotoEditor ref={editorRef} disabled={controlsDisabled} imageUrl={copy?.graphic_url || originalUrl}
               headline={design || !copy?.graphic_url ? copy?.headline || null : null} subtitle={copy?.graphic_subtitle || ''}
               design={design} filters={filters} onDesignChange={changeDesign} selectedElement={selectedElement} onSelectElement={selectElement}
-              elementLayout={elementLayout} onLayoutChange={setElementLayout} onWarningChange={setGraphicWarning} />
-            <div className="studio-preview-tools"><h2 id="studio-preview-title">{translateUI("Anteprima")}</h2>{landscapeGuide}{drawer}</div>
+              elementLayout={elementLayout} onLayoutChange={setElementLayout} onWarningChange={setGraphicWarning}>
+              <div className="studio-preview-tools"><h2 id="studio-preview-title">{translateUI("Anteprima")}</h2>{landscapeGuide}{drawer}</div>
+            </PhotoEditor>
           </section>}
           {originalUrl && <section className="studio-result" aria-label={translateUI("Il tuo post")}>
             {hasContent ? <>
-              <PostCaption platform={PLATFORMS[String(platform).toLowerCase()]}
+              <PostCaption platform={captionPlatform}
                 value={[copy?.caption, copy?.hashtags].filter(Boolean).join('\n\n')}
                 onChange={caption => setCopy({ ...copy, caption, hashtags: '' })}
                 readOnly={locked} disabled={controlsDisabled && !locked} />
-              {!locked && <div className="studio-destination"><label htmlFor="studio-destination">{translateUI("Pubblica su")}</label><AppSelect id="studio-destination" value={String(platform).toLowerCase()} onChange={event => setPlatform(event.target.value)} disabled={controlsDisabled}><option value="instagram">{translateUI("Instagram")}</option><option value="facebook">{translateUI("Facebook")}</option>{String(platform).toLowerCase() === 'tiktok' && <option value="tiktok" disabled>{translateUI("Canale non disponibile")}</option>}</AppSelect></div>}
+              {!locked && <PublishChannels channels={channels} onChange={changeChannels} disabled={controlsDisabled || publication?.fixed} />}
               {saveButtons}
               {(!locked || context) && <div className="studio-revision">
                 <details ref={requestDetails} data-tour="studio-context">

@@ -26,6 +26,7 @@ export function StudioStateProvider({ children }) {
   const draftRevision = useRef(0);
   const [originalUrl, setOriginalUrl] = useState(null);
   const [platform, setPlatform] = useState("Instagram");
+  const [publication, setPublication] = useState(null);
   /** Il tono non personalizzato segue il profilo aggiornato quando si apre lo Studio. */
   const [tone, setTone] = useState(null);
   const [mode, setMode] = useState(DEFAULT_MODE);
@@ -42,13 +43,13 @@ export function StudioStateProvider({ children }) {
   const [planning, setPlanning] = useState(null);
   const [editorialAt, setEditorialAt] = useState(null);
 
-  const previewDraft = { originalUrl, platform, tone, mode, title, context, copy, filters, activePreset, editingId, postStatus, design, planning, editorialAt };
+  const previewDraft = { originalUrl, platform, publication, tone, mode, title, context, copy, filters, activePreset, editingId, postStatus, design, planning, editorialAt };
   const previewState = useRef(null);
   previewState.current = { userId: user?.id || null, draft: previewDraft, generating };
   const applyPreviewDraft = saved => {
     if (!saved || typeof saved !== 'object') return;
     draftRevision.current++;
-    setOriginalUrl(saved.originalUrl); setPlatform(saved.platform); setTone(saved.tone); setMode(saved.mode);
+    setOriginalUrl(saved.originalUrl); setPlatform(saved.platform); setPublication(saved.publication || null); setTone(saved.tone); setMode(saved.mode);
     setTitle(saved.title); setContext(saved.context); setCopy(saved.copy); setFilters(saved.filters);
     setActivePreset(saved.activePreset); setEditingId(saved.editingId); setPostStatus(saved.postStatus);
     setDesign(saved.design); setPlanning(saved.planning); setEditorialAt(saved.editorialAt);
@@ -70,7 +71,7 @@ export function StudioStateProvider({ children }) {
   }, [user?.id]);
   useEffect(() => {
     if (isIPhonePreview() && previewReady) sendPreviewMessage(window.parent, 'state', previewState.current);
-  }, [previewReady, user?.id, originalUrl, platform, tone, mode, title, context, copy, filters, activePreset, editingId, postStatus, design, planning, editorialAt, generating]);
+  }, [previewReady, user?.id, originalUrl, platform, publication, tone, mode, title, context, copy, filters, activePreset, editingId, postStatus, design, planning, editorialAt, generating]);
 
   const persist = record => {
     if (!record?.key) return;
@@ -88,7 +89,7 @@ export function StudioStateProvider({ children }) {
     persist(latestDraft.current);
     latestDraft.current = null;
     draftRevision.current++;
-    setOriginalUrl(null); setPlatform('Instagram'); setTone(null); setMode(DEFAULT_MODE);
+    setOriginalUrl(null); setPlatform('Instagram'); setPublication(null); setTone(null); setMode(DEFAULT_MODE);
     setTitle(''); setContext(''); setCopy(null); setFilters({ ...DEFAULT_FILTERS });
     setActivePreset('Originale'); setEditingId(null); setPostStatus('bozza'); setGenerating(false);
     setDesign(null); setPlanning(null); setEditorialAt(null);
@@ -96,7 +97,7 @@ export function StudioStateProvider({ children }) {
       if (!active) return;
       const saved = restoreStudioDraft(value, DEFAULT_FILTERS);
       if (saved) {
-        setOriginalUrl(saved.originalUrl); setPlatform(saved.platform); setTone(saved.tone); setMode(saved.mode);
+        setOriginalUrl(saved.originalUrl); setPlatform(saved.platform); setPublication(saved.publication); setTone(saved.tone); setMode(saved.mode);
         setTitle(saved.title); setContext(saved.context); setCopy(saved.copy); setFilters(saved.filters);
         setActivePreset(saved.activePreset); setEditingId(saved.editingId); setPostStatus(saved.postStatus);
         setDesign(saved.design); setPlanning(saved.planning); setEditorialAt(saved.editorialAt);
@@ -107,11 +108,11 @@ export function StudioStateProvider({ children }) {
 
   useEffect(() => {
     if (!isNative || !ready || !storageKey) return;
-    const record = { key: storageKey, data: { originalUrl, platform, tone, mode, title, context, copy, filters, activePreset, editingId, postStatus, design, planning, editorialAt } };
+    const record = { key: storageKey, data: { originalUrl, platform, publication, tone, mode, title, context, copy, filters, activePreset, editingId, postStatus, design, planning, editorialAt } };
     latestDraft.current = record;
     const timer = setTimeout(() => persist(record), 200);
     return () => clearTimeout(timer);
-  }, [ready, storageKey, originalUrl, platform, tone, mode, title, context, copy, filters, activePreset, editingId, postStatus, design, planning, editorialAt]);
+  }, [ready, storageKey, originalUrl, platform, publication, tone, mode, title, context, copy, filters, activePreset, editingId, postStatus, design, planning, editorialAt]);
 
   useEffect(() => {
     if (!isNative) return;
@@ -121,6 +122,7 @@ export function StudioStateProvider({ children }) {
 
   const resetDraft = () => {
     draftRevision.current++;
+    setPublication(null);
     setOriginalUrl(null);
     setCopy(null);
     setMode(DEFAULT_MODE); setTone(null);
@@ -148,6 +150,7 @@ export function StudioStateProvider({ children }) {
         setOriginalUrl,
         platform,
         setPlatform,
+        publication, setPublication,
         tone,
         setTone,
         mode,

@@ -1,4 +1,5 @@
 import { normalizeDesign } from '../../shared/templates.mjs';
+import { validChannels } from '../../shared/publish-channels.mjs';
 const imagePath = value => typeof value === 'string' && /^\/api\/files\/[a-f0-9-]{36}$/.test(value) ? value : null;
 const text = (value, max) => typeof value === 'string' ? value.slice(0, max) : '';
 
@@ -17,6 +18,7 @@ export function restoreStudioDraft(raw, defaults) {
   }
   return {
     originalUrl: imagePath(data.originalUrl),
+    publication: validChannels(data.publication?.channels) ? { channels:data.publication.channels, fixed:data.publication.fixed === true } : null,
     design, planning: data.planning ? { topic: text(data.planning.topic, 200), objective: text(data.planning.objective, 2000), shots: text(data.planning.shots, 5000), notes: text(data.planning.notes, 5000), provisional_copy: text(data.planning.provisional_copy, 5000), stage: text(data.planning.stage, 30), shooting_at: text(data.planning.shooting_at, 30) || null } : null,
     editorialAt: text(data.editorialAt, 30) || null,
     platform: ['instagram', 'facebook', 'tiktok'].includes(String(data.platform).toLowerCase()) ? data.platform : 'Instagram',

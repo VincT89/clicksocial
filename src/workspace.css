@@ -219,7 +219,7 @@
 .home-main .empty-content a { min-height:44px; display:inline-flex; align-items:center; font-size:13px; color:hsl(var(--accent-foreground)); }
 .post-state.state-in_coda,.post-state.state-pubblicato { border-radius:6px; padding:1px 7px; background:#e2f5e9; }
 .dark .post-state.state-in_coda,.dark .post-state.state-pubblicato { background:#193e31; }
-.studio-preview-panel,.studio-result { box-shadow:var(--surface-shadow); }
+.studio-photo-card,.studio-result { box-shadow:var(--surface-shadow); }
 .app-primary-button { background-image:linear-gradient(to bottom, rgb(255 255 255 / .07), rgb(255 255 255 / 0)); box-shadow:var(--button-shadow); font-weight:600; }
 .app-primary-button:active { box-shadow:inset 0 2px 4px rgb(0 0 0 / .12); }
 @media (max-width:767px) {

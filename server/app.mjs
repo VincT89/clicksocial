@@ -16,9 +16,10 @@ import { instant, editablePost, planPost, cancelSchedule } from './editorial.mjs
 import { postDownload } from './zip.mjs';
 import { sessionToken, isNativeRequest, mobileRequestPolicy } from './mobile-access.mjs';
 import { createClientAddressResolver } from './client-address.mjs';
+import { validChannels } from '../shared/publish-channels.mjs';
 
 const profileFields = ['company_name','company_field','brand_identity','tone_of_voice','company_logo_url','setup_completed','brand_settings','preferred_template'];
-const postFields = ['title','image_url','original_image_url','graphic_url','editor_filters','editor_preset','headline','caption','hashtags','context','platform','format','mode','tone','quality','company_name','status','design','planning','editorial_at','graphic_subtitle'];
+const postFields = ['title','image_url','original_image_url','graphic_url','editor_filters','editor_preset','headline','caption','hashtags','context','platform','publish_channels','format','mode','tone','quality','company_name','status','design','planning','editorial_at','graphic_subtitle'];
 const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 const emailValue = value => {
   const email = typeof value === 'string' ? value.trim().toLowerCase() : '';
@@ -135,6 +136,11 @@ export async function createApp(options = {}) {
     if (Object.keys(body).some(key => !postFields.includes(key))) fail(400,'Il post contiene campi non modificabili.');
     const data = { platform: 'instagram', mode:'original', tone:'amichevole', status:'pronto', ...previous };
     for (const [key, value] of Object.entries(body)) {
+      if (key === 'publish_channels') {
+        if (!validChannels(value)) fail(400,'Seleziona Instagram, Facebook o entrambi.');
+        data.publish_channels = value;
+        continue;
+      }
       if (key === 'planning') { data.planning = validatePlanning(value); continue; }
       if (key === 'design') { data.design = await validateDesign(db, config, user, value, JSON.parse(user.profile)); data.format = data.design.format; continue; }
       if (key === 'editorial_at') { data.editorial_at = value === null ? null : instant(value); continue; }
@@ -142,6 +148,9 @@ export async function createApp(options = {}) {
       data[key] = value;
     }
     if (!['instagram','facebook','tiktok'].includes(data.platform)) fail(400,'Piattaforma non valida.');
+    if ('platform' in body && !('publish_channels' in body) && data.platform !== previous.platform) delete data.publish_channels;
+    if (data.publish_channels?.length && !data.publish_channels.includes(data.platform)) fail(400,'Il canale principale deve essere tra quelli selezionati.');
+    if (previous.publication_group && (data.platform !== previous.platform || data.publish_channels?.length !== 1)) fail(409,'Questo invio è già associato a un canale.');
     if (body.status && !['pronto','bozza'].includes(body.status)) fail(400,'Lo stato di pubblicazione viene gestito dal server.');
     if (!['original','enhance','creative','graphic'].includes(data.mode)) fail(400,'Modalita non valida.');
     if ('editorial_at' in body && !data.planning) fail(400, 'Usa la pianificazione del post per modificarne la data.');
@@ -224,7 +233,7 @@ export async function createApp(options = {}) {
     const socialPost = path.match(/^\/api\/social\/posts\/([a-f0-9-]{36})\/(prepare|resolve)$/);
     if (socialPost) {
       const user = await requiredUser(req);
-      if (method === 'GET' && socialPost[2] === 'prepare') return integrations.publication.prepare(user, socialPost[1]);
+      if (method === 'GET' && socialPost[2] === 'prepare') return integrations.publication.prepare(user, socialPost[1], url.searchParams.get('platform'));
       if (method === 'POST' && socialPost[2] === 'resolve') return integrations.publication.resolve(user, socialPost[1], await bodyJson(req));
       fail(405, 'Operazione non consentita.');
     }

@@ -7,13 +7,15 @@ import { editorialDate, editorialStage, platformLabel, scheduledTime, STAGES } f
 import { Image } from '@/components/ui/image';
 import { downloadPost, isNative, openExternal } from '@/lib/mobile';
 import { toast } from 'sonner';
+import { postChannels } from '../../../shared/publish-channels.mjs';
 
 export default function EditorialPost({ post, compact = false, onPlan, onSchedule, onAction, onCopy, onBrief }) {
   useI18n();
   const locked = ['in_coda','in_pubblicazione','pubblicato','da_verificare'].includes(post.status);
   const planningOnly = !!post.planning && !post.image_url;
   const date = Number.isFinite(scheduledTime(post)) ? post.scheduled_at : editorialDate(post);
-  const platform = platformLabel(post.platform);
+  const channels = postChannels(post);
+  const platform = channels.length === 2 ? translateUI('Instagram e Facebook') : platformLabel(channels[0]);
   const title = post.title || post.headline || post.planning?.topic || 'Senza titolo';
   const source = post.image_url || post.original_image_url;
   const link = '/studio?id=' + post.id;
@@ -40,7 +42,7 @@ export default function EditorialPost({ post, compact = false, onPlan, onSchedul
     <div data-tour="library-actions" className="mt-auto pt-2">
       <div className="flex flex-wrap items-center gap-1">
         {(compact || locked || planningOnly) && <Button variant={planningOnly ? 'default' : 'outline'} size="sm" className="min-h-11 h-auto min-w-0 whitespace-normal px-2 leading-4" asChild><Link to={link}>{locked ? translateUI("Visualizza") : planningOnly ? translateUI("Prepara") : translateUI("Modifica")}</Link></Button>}
-        {!planningOnly && !locked && <Button size="sm" className="h-11 min-w-min whitespace-normal px-3 leading-4" disabled={!platform} onClick={() => onSchedule(post)}>{translateUI("Pubblica")}</Button>}
+        {!planningOnly && !locked && <Button size="sm" className="h-11 min-w-min whitespace-normal px-3 leading-4" disabled={!platform} onClick={() => onSchedule(post)}>{post.publication_group && post.status === 'fallito' ? translateUI('Riprova su {platform}', { platform }) : translateUI("Pubblica")}</Button>}
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="ml-auto h-11 w-11 shrink-0" aria-label={translateUI("Altre azioni per ") + (post.title || translateUI("Senza titolo"))}><MoreHorizontal size={18} /></Button></DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64 max-w-[calc(100vw-2rem)]">

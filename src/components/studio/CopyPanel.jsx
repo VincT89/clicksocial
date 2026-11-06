@@ -4,6 +4,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { POST_TONES } from '../../../shared/postDefaults.mjs';
+import PublishChannels from './PublishChannels';
 
 const modes = [
   { value: 'graphic', label: 'Grafica AI', hint: 'Foto e scritte create insieme' },
@@ -11,7 +12,7 @@ const modes = [
   { value: 'enhance', label: 'Ritocco', hint: 'Migliora la foto senza trasformarla' },
   { value: 'original', label: 'Originale', hint: 'Mantiene la foto che hai caricato' },
 ];
-export default function CopyPanel({ platform, setPlatform, tone, setTone, mode, setMode, generating, copy, setCopy, templateMode = false, autoTextStyle = true, onAutoTextStyleChange, imageText = false }) {
+export default function CopyPanel({ channels, onChannelsChange, fixedChannel, tone, setTone, mode, setMode, generating, copy, setCopy, templateMode = false, autoTextStyle = true, onAutoTextStyleChange, imageText = false }) {
   useI18n();
   return <div className="space-y-5">
     <fieldset data-tour="studio-mode" disabled={generating}>
@@ -22,11 +23,7 @@ export default function CopyPanel({ platform, setPlatform, tone, setTone, mode, 
       </button>)}</div>
     </fieldset>
     {mode === 'graphic' ? <p className="text-sm text-muted-foreground">{translateUI("L’AI compone foto, scritte e stile insieme, senza fondini aggiunti. Per cambiare le scritte serve rigenerare. Logo e descrizione restano modificabili.")}</p> : templateMode && <div className="space-y-1"><div className="setting-switch"><label htmlFor="auto-text-style">{translateUI("Stile testo automatico")}</label><Switch id="auto-text-style" checked={autoTextStyle} disabled={generating} onCheckedChange={onAutoTextStyleChange} aria-describedby="auto-text-style-help" /></div><p id="auto-text-style-help" className="text-xs text-muted-foreground">{translateUI("L’AI sceglie font, dimensioni e colori adatti alla foto, senza sfondi dietro alle scritte. Disattiva per conservare lo stile personalizzato. Le posizioni spostate da te restano fisse.")}</p></div>}
-    <fieldset data-tour="studio-platform" disabled={generating}>
-      <legend className="text-sm font-medium mb-2">{translateUI("Dove vuoi pubblicare")}</legend>
-      <div className="grid grid-cols-2 gap-2">{['Instagram','Facebook'].map(p => <button key={p} type="button" aria-pressed={String(platform).toLowerCase() === p.toLowerCase()} onClick={() => setPlatform(p)}
-        className={['rounded-xl border py-3 text-xs font-medium', String(platform).toLowerCase() === p.toLowerCase() ? 'border-purple bg-accent text-foreground' : 'border-border hover:bg-secondary'].join(' ')}>{p}</button>)}</div>
-    </fieldset>
+    <div data-tour="studio-platform"><PublishChannels channels={channels} onChange={onChannelsChange} disabled={generating || fixedChannel} label="Dove vuoi pubblicare" /></div>
     <div data-tour="studio-tone"><label htmlFor="post-tone" className="text-sm font-medium block mb-2">{translateUI("Tono del testo")}</label><AppSelect id="post-tone" value={tone} onChange={event => setTone(event.target.value)} disabled={generating} className="w-full min-h-11 rounded-md border border-input bg-background px-3 text-sm">{Object.entries(POST_TONES).map(([value, label]) => <option key={value} value={value}>{translateUI(label)}</option>)}</AppSelect></div>
     <div className="space-y-3 pt-4 border-t border-border">
       <div><label htmlFor="copy-headline" className="text-sm font-medium">{translateUI("Titolo sulla foto")}</label>
