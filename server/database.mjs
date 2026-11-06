@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { SQLITE_SCHEMA, MYSQL_SCHEMA, TABLES } from './schema.mjs';
+import { SQLITE_SCHEMA, MYSQL_SCHEMA, SCHEMA_VERSION, TABLES } from './schema.mjs';
 
 const keyHash = config => createHash('sha256').update(config.encryptionKey).digest('hex');
 const choose = (query, kind) => {
@@ -97,13 +97,13 @@ export async function initializeMySQL(db, config) {
     if (names.length && !names.includes('clicksocial_meta')) throw new Error('Il database MySQL contiene già tabelle estranee a ClickSocial. Usa un database dedicato e vuoto.');
     if (names.includes('clicksocial_meta')) {
       const [[meta]] = await connection.query('SELECT * FROM clicksocial_meta WHERE id=1');
-      if (meta && ![0, 1].includes(meta.schema_version)) throw new Error('Versione del database MySQL non supportata da questa copia dell’app.');
+      if (meta && ![0, 1, SCHEMA_VERSION].includes(meta.schema_version)) throw new Error('Versione del database MySQL non supportata da questa copia dell’app.');
       if (meta && meta.key_hash !== keyHash(config)) throw new Error('Questo database usa una chiave diversa. Ripristina data/.encryption-key dalla stessa installazione per conservarne sessioni e collegamenti.');
     }
     await connection.query(MYSQL_SCHEMA[0]);
     await connection.execute('INSERT IGNORE INTO clicksocial_meta (id,schema_version,key_hash) VALUES (1,0,?)', [keyHash(config)]);
     for (const sql of MYSQL_SCHEMA.slice(1)) await connection.query(sql);
-    await connection.query('UPDATE clicksocial_meta SET schema_version=1 WHERE id=1');
+    await connection.execute('UPDATE clicksocial_meta SET schema_version=? WHERE id=1', [SCHEMA_VERSION]);
   } finally {
     try { if (locked) await connection.execute('SELECT RELEASE_LOCK(?)', [lock]); }
     finally { connection.release(); }
@@ -116,7 +116,11 @@ export async function openDatabase(config, { initialize = true } = {}) {
     const connection = new DatabaseSync(join(config.dataDir, 'clicksocial.sqlite'), { timeout: 5000 });
     try {
       connection.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;');
-      if (initialize) connection.exec(SQLITE_SCHEMA);
+      if (initialize) {
+        const version = connection.prepare('PRAGMA user_version').get().user_version;
+        if (![0, 1, SCHEMA_VERSION].includes(version)) throw new Error('Versione del database SQLite non supportata da questa copia dell’app.');
+        connection.exec(SQLITE_SCHEMA);
+      }
       return new Store('sqlite', connection);
     } catch (error) { connection.close(); throw error; }
   }

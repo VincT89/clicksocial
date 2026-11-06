@@ -1,3 +1,4 @@
+import { useI18n, translate as translateUI } from '@/lib/i18n';
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import * as Dialog from '@radix-ui/react-dialog';
 import { Maximize2 } from 'lucide-react';
@@ -53,6 +54,7 @@ const PhotoEditor = forwardRef(/** @param {{imageUrl:string,headline?:string,sub
   { imageUrl, headline, subtitle = '', design = null, filters, disabled = false, onDesignChange, selectedElement, onSelectElement, elementLayout = {}, onLayoutChange, onWarningChange },
   ref
 ) {
+  useI18n();
   const [exporting, setExporting] = useState(false);
   const [rendering, setRendering] = useState(false);
   const canvasRef = useRef(null);
@@ -142,31 +144,31 @@ const PhotoEditor = forwardRef(/** @param {{imageUrl:string,headline?:string,sub
   }));
 
   return <Dialog.Root><div data-tour="studio-editor" className="studio-editor" aria-busy={rendering || exporting || !source}>
-    <div ref={viewportRef} className="studio-preview-viewport">
+    <div ref={viewportRef} className="studio-preview-viewport" style={{ aspectRatio:ratio }}>
       <div className="studio-preview-frame" style={{ width, height: width / ratio }}>
         <Dialog.Trigger asChild>
-          <button type="button" className="studio-preview-open" aria-label="Apri anteprima a tutto schermo"
+          <button type="button" className="studio-preview-open" aria-label={translateUI("Apri anteprima a tutto schermo")}
             disabled={!source || !!imageError || rendering || exporting} onClick={() => onSelectElement?.('')}>
-            <canvas ref={canvasRef} role="img" aria-label={headline ? `Anteprima della foto con il titolo: ${headline}` : 'Anteprima della foto'} className={`block h-full w-full ${!source ? 'invisible' : ''}`} />
+            <canvas ref={canvasRef} role="img" aria-label={headline ? `Anteprima della foto con il titolo: ${headline}` : translateUI("Anteprima della foto")} className={`block h-full w-full ${!source ? 'invisible' : ''}`} />
             <Maximize2 size={18} className="studio-preview-open-icon" aria-hidden="true" />
           </button>
         </Dialog.Trigger>
-        {!source && <p role={imageError ? 'alert' : 'status'} className="absolute inset-0 flex items-center justify-center p-4 text-sm text-muted-foreground text-center">{imageError || 'Caricamento dell’anteprima…'}</p>}
+        {!source && <p role={imageError ? 'alert' : 'status'} className="absolute inset-0 flex items-center justify-center p-4 text-sm text-muted-foreground text-center">{imageError || translateUI("Caricamento dell’anteprima…")}</p>}
         {source && design && !imageError && <ElementOverlay design={design} onChange={onDesignChange} layout={elementLayout} selected={selectedElement} onSelect={onSelectElement} disabled={disabled || exporting} />}
       </div>
     </div>
     {source && imageError && <p role="alert" className="studio-preview-warning">{imageError}</p>}
-    {exporting && <p role="status" className="text-xs text-muted-foreground">Esportazione foto…</p>}
+    {exporting && <p role="status" className="text-xs text-muted-foreground">{translateUI("Esportazione foto…")}</p>}
   </div>
     <Dialog.Portal>
       <Dialog.Overlay className="studio-drawer-overlay" />
       <Dialog.Content className="studio-full-preview" aria-describedby={undefined}>
         <div className="studio-full-preview-header">
-          <Dialog.Title className="font-heading text-lg">Anteprima del post</Dialog.Title>
-          <Dialog.Close asChild><button type="button" aria-label="Chiudi anteprima">Chiudi</button></Dialog.Close>
+          <Dialog.Title className="font-heading text-lg">{translateUI("Anteprima del post")}</Dialog.Title>
+          <Dialog.Close asChild><button type="button" aria-label={translateUI("Chiudi anteprima")}>{translateUI("Chiudi")}</button></Dialog.Close>
         </div>
         <div className="studio-full-preview-image">
-          <canvas ref={copyPreview} role="img" aria-label={headline || 'Anteprima del post'} />
+          <canvas ref={copyPreview} role="img" aria-label={headline || translateUI("Anteprima del post")} />
         </div>
       </Dialog.Content>
     </Dialog.Portal>

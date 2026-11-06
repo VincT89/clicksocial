@@ -1,3 +1,4 @@
+import { useI18n, translate as translateUI } from '@/lib/i18n';
 import { useEffect, useRef, useState } from 'react';
 import { Camera, RefreshCw } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -8,6 +9,7 @@ import { captureNativePhoto } from '@/lib/nativeCamera';
 import { useAuth } from '@/lib/AuthContext';
 
 export default function CameraCapture({ open, onOpenChange, onCapture, busy, initialPhoto = null }) {
+  useI18n();
   const { user } = useAuth();
   const video = useRef(null);
   const nativeInput = useRef(null);
@@ -72,26 +74,26 @@ export default function CameraCapture({ open, onOpenChange, onCapture, busy, ini
   };
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="sm:max-w-xl max-h-[90dvh] overflow-y-auto">
-      <DialogHeader><DialogTitle>Scatta una foto</DialogTitle>
-        <DialogDescription>Attiva la fotocamera, scatta e controlla l’anteprima. La foto viene caricata solo quando scegli Usa foto.</DialogDescription>
+      <DialogHeader><DialogTitle>{translateUI("Scatta una foto")}</DialogTitle>
+        <DialogDescription>{translateUI("Attiva la fotocamera, scatta e controlla l’anteprima. La foto viene caricata solo quando scegli Usa foto.")}</DialogDescription>
       </DialogHeader>
       <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-secondary flex items-center justify-center">
-        {photo ? <img src={photo.url} alt="Anteprima dello scatto" className="w-full h-full object-contain" /> : <>
-          <video ref={video} autoPlay muted playsInline aria-label="Anteprima fotocamera" className={status === 'ready' ? 'w-full h-full object-contain' : 'hidden'} />
-          {status !== 'ready' && <p className="p-5 text-center text-sm text-muted-foreground" role="status">{status === 'opening' ? 'Apertura della fotocamera…' : 'La fotocamera è spenta.'}</p>}
+        {photo ? <img src={photo.url} alt={translateUI("Anteprima dello scatto")} className="w-full h-full object-contain" /> : <>
+          <video ref={video} autoPlay muted playsInline aria-label={translateUI("Anteprima fotocamera")} className={status === 'ready' ? 'w-full h-full object-contain' : 'hidden'} />
+          {status !== 'ready' && <p className="p-5 text-center text-sm text-muted-foreground" role="status">{status === 'opening' ? translateUI("Apertura della fotocamera…") : translateUI("La fotocamera è spenta.")}</p>}
         </>}
       </div>
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       <div className="flex flex-wrap justify-center gap-2">
         {photo ? <>
-          <Button variant="outline" onClick={() => start()} disabled={busy}>Rifai foto</Button>
-          <Button onClick={() => onCapture(photo.file)} disabled={busy}>{busy ? 'Caricamento…' : 'Usa foto'}</Button>
+          <Button variant="outline" onClick={() => start()} disabled={busy}>{translateUI("Rifai foto")}</Button>
+          <Button onClick={() => onCapture(photo.file)} disabled={busy}>{busy ? translateUI("Caricamento…") : translateUI("Usa foto")}</Button>
         </> : status === 'ready' ? <>
-          <Button variant="outline" onClick={() => start(facing === 'environment' ? 'user' : 'environment')}><RefreshCw size={16} className="mr-2" />Cambia fotocamera</Button>
-          <Button onClick={capture}><Camera size={16} className="mr-2" />Scatta</Button>
-        </> : <Button onClick={() => start()} disabled={status === 'opening'}>Attiva fotocamera</Button>}
+          <Button variant="outline" onClick={() => start(facing === 'environment' ? 'user' : 'environment')}><RefreshCw size={16} className="mr-2" />{translateUI("Cambia fotocamera")}</Button>
+          <Button onClick={capture}><Camera size={16} className="mr-2" />{translateUI("Scatta")}</Button>
+        </> : <Button onClick={() => start()} disabled={status === 'opening'}>{translateUI("Attiva fotocamera")}</Button>}
       </div>
-      {!photo && !isNative && <Button variant="ghost" disabled={busy} onClick={() => { session.current?.stop(); setStatus('idle'); nativeInput.current?.click(); }}>Usa la fotocamera del dispositivo</Button>}
+      {!photo && !isNative && <Button variant="ghost" disabled={busy} onClick={() => { session.current?.stop(); setStatus('idle'); nativeInput.current?.click(); }}>{translateUI("Usa la fotocamera del dispositivo")}</Button>}
       <input ref={nativeInput} className="hidden" type="file" accept="image/jpeg,image/png,image/webp,image/gif" capture="environment" onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) { setPhoto({ url: URL.createObjectURL(file), file }); setStatus('preview'); setError(''); } }} />
     </DialogContent>
   </Dialog>;

@@ -1,3 +1,4 @@
+import { useI18n, translate as translateUI } from '@/lib/i18n';
 import { useAuth } from '@/lib/AuthContext';
 import React, { useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -12,6 +13,7 @@ import { safeReturnTo } from "@/lib/authReturnTo";
 import { isNativeIOS } from "@/lib/mobile";
 
 export default function Login() {
+  useI18n();
   const { appPublicSettings } = useAuth();
   const localSettings = appPublicSettings?.public_settings || {};
   const [email, setEmail] = useState("");
@@ -22,7 +24,7 @@ export default function Login() {
   // Post-login destination (e.g. the MCP OAuth consent page sends users here
   // with returnTo so the grant flow can resume). Same-origin paths only.
   const returnTo = safeReturnTo();
-  const dest = returnTo !== "/" ? returnTo : "/studio";
+  const dest = returnTo !== "/" ? returnTo : "/home";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -47,23 +49,20 @@ export default function Login() {
   return (
     <SplitAuth
       theme="purple"
-      label="Bentornato"
-      title="Riprendi da dove avevi lasciato."
-      text="Le tue bozze, i tuoi scatti e le tue idee sono ancora al loro posto."
+      label={translateUI("Bentornato")}
+      title={translateUI("Riprendi da dove avevi lasciato.")}
+      text={translateUI("Le tue bozze, i tuoi scatti e le tue idee sono ancora al loro posto.")}
       footer={
-        <>
-          Non hai un account?{" "}
+        <>{translateUI("Non hai un account?")}{" "}
           <Link
             to={"/register" + (returnTo !== "/" ? "?returnTo=" + encodeURIComponent(returnTo) : "")}
             className="text-primary font-medium hover:underline"
-          >
-            Crea uno spazio
-          </Link>
+          >{translateUI("Crea uno spazio")}</Link>
         </>
       }
     >
-      <h2 className="font-heading text-2xl font-bold tracking-tight">Accedi</h2>
-      <p className="text-sm text-muted-foreground mt-1 mb-6">Entra nel tuo studio.</p>
+      <h1 className="font-heading text-2xl font-bold tracking-tight">{translateUI("Accedi")}</h1>
+      <p className="text-sm text-muted-foreground mt-1 mb-6">{translateUI("Entra nel tuo studio.")}</p>
 
       <Button
         variant="outline"
@@ -71,28 +70,26 @@ export default function Login() {
         onClick={handleGoogle}
         disabled={!localSettings.googleEnabled}
       >
-        <GoogleIcon className="w-5 h-5 mr-2" />
-        Continua con Google
-      </Button>
+        <GoogleIcon className="w-5 h-5 mr-2" />{translateUI("Continua con Google")}</Button>
 
       <div className="relative mb-6">
         <div className="absolute inset-0 flex items-center">
           <div className="w-full border-t border-border" />
         </div>
         <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-background px-3 text-muted-foreground">oppure</span>
+          <span className="bg-background px-3 text-muted-foreground">{translateUI("oppure")}</span>
         </div>
       </div>
 
       {error && (
-        <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-          {error}
+        <div role="alert" className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+          {translateUI(error)}
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">{translateUI("Email")}</Label>
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
             <Input
@@ -109,7 +106,7 @@ export default function Login() {
                   passwordRef.current?.focus();
                 }
               }}
-              placeholder="nome@esempio.it"
+              placeholder={translateUI("nome@esempio.it")}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="pl-10 h-12"
@@ -119,10 +116,8 @@ export default function Login() {
         </div>
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
-            <Link to="/forgot-password" className="text-xs text-primary hover:underline">
-              Password dimenticata?
-            </Link>
+            <Label htmlFor="password">{translateUI("Password")}</Label>
+            <Link to="/forgot-password" className="text-xs text-primary hover:underline">{translateUI("Password dimenticata?")}</Link>
           </div>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
@@ -143,11 +138,9 @@ export default function Login() {
         <Button type="submit" className="w-full h-12 font-medium rounded-full" disabled={loading}>
           {loading ? (
             <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Accesso in corso…
-            </>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />{translateUI("Accesso in corso…")}</>
           ) : (
-            "Accedi"
+            translateUI("Accedi")
           )}
         </Button>
       </form>

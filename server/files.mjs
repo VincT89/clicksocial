@@ -1,6 +1,8 @@
 import { readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { fail, now, uid } from './store.mjs';
+import { imageGeometry } from './imageGeometry.mjs';
+import { MAX_IMAGE_BYTES } from '../shared/media.mjs';
 
 export function sniffImage(bytes) {
   if (bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]))) return 'image/png';
@@ -9,12 +11,23 @@ export function sniffImage(bytes) {
   if (['GIF87a','GIF89a'].includes(bytes.subarray(0,6).toString())) return 'image/gif';
   fail(400, 'Carica una vera immagine JPEG, PNG, WebP o GIF.');
 }
-export async function saveImage(db, config, user, bytes, name = 'immagine') {
-  if (!bytes.length || bytes.length > 15 * 1024 * 1024) fail(400, 'Immagine vuota o superiore a 15 MB.');
+export async function saveImage(db, config, user, bytes, name = 'immagine', { media = false } = {}) {
+  if (!bytes.length || bytes.length > MAX_IMAGE_BYTES) fail(400, 'Immagine vuota o superiore a 15 MB.');
   const mime = sniffImage(bytes);
+  if (media) {
+    try { imageGeometry(bytes); } catch { fail(400, 'Il file non contiene un’immagine leggibile.'); }
+  }
   const id = uid();
   writeFileSync(join(config.dataDir, 'uploads', id), bytes, { flag: 'wx' });
-  try { await db.prepare('INSERT INTO files VALUES (?,?,?,?,?,?)').run(id, user.id, mime, String(name).slice(0,200), bytes.length, now()); }
+  const insertFile = () => db.prepare('INSERT INTO files VALUES (?,?,?,?,?,?)').run(id, user.id, mime, String(name).slice(0,200), bytes.length, now());
+  try {
+    if (media) {
+      await db.transaction(async () => {
+        await insertFile();
+        await db.prepare('INSERT INTO media_uploads (file_id) VALUES (?)').run(id);
+      });
+    } else await insertFile();
+  }
   catch (error) { unlinkSync(join(config.dataDir, 'uploads', id)); throw error; }
   return { file_url: '/api/files/' + id };
 }

@@ -1,65 +1,29 @@
-import { useEffect, useState } from "react";
-
-// Tema chiaro/scuro con persistenza in localStorage.
-// Chiave: "cs-theme" ("light" | "dark"). Se assente, segue il sistema.
-const STORAGE_KEY = "cs-theme";
-
-function systemPrefersDark() {
-  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+import { useEffect, useSyncExternalStore } from 'react';
+const listeners = new Set();
+const media = window.matchMedia('(prefers-color-scheme: dark)');
+const saved = () => { try { return localStorage.getItem('cs-theme'); } catch { return null; } };
+let preference = ['light', 'dark'].includes(saved()) ? saved() : 'system';
+const resolved = () => preference === 'system' ? (media.matches ? 'dark' : 'light') : preference;
+const subscribe = listener => { listeners.add(listener); return () => listeners.delete(listener); };
+function apply() {
+  document.documentElement.classList.toggle('dark', resolved() === 'dark');
+  listeners.forEach(listener => listener());
 }
-
-function resolveTheme() {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored === "light" || stored === "dark") return stored;
-  return systemPrefersDark() ? "dark" : "light";
+media.addEventListener('change', apply);
+window.addEventListener('storage', event => {
+  if (event.key !== 'cs-theme') return;
+  preference = ['light', 'dark'].includes(event.newValue) ? event.newValue : 'system';
+  apply();
+});
+export function setThemePreference(value) {
+  if (!['light', 'dark', 'system'].includes(value)) return;
+  preference = value;
+  try { localStorage.setItem('cs-theme', value); } catch { /** La preferenza continua a funzionare per questa sessione. */ }
+  apply();
 }
-
-function applyTheme(theme) {
-  document.documentElement.classList.toggle("dark", theme === "dark");
-}
-
-// Hook usato una volta in App.jsx per inizializzare il tema all'avvio.
-export default function useDarkMode() {
-  useEffect(() => {
-    applyTheme(resolveTheme());
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => {
-      if (!localStorage.getItem(STORAGE_KEY)) {
-        applyTheme(systemPrefersDark() ? "dark" : "light");
-      }
-    };
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
-}
-
-// Hook per il componente toggle: restituisce il tema corrente e una funzione toggle.
-// Scrive la preferenza in localStorage solo quando l'utente la cambia esplicitamente.
 export function useTheme() {
-  const [theme, setTheme] = useState(resolveTheme);
-
-  useEffect(() => {
-    applyTheme(theme);
-  }, [theme]);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => {
-      if (!localStorage.getItem(STORAGE_KEY)) {
-        setTheme(systemPrefersDark() ? "dark" : "light");
-      }
-    };
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
-
-  const toggle = () => {
-    setTheme((t) => {
-      const next = t === "dark" ? "light" : "dark";
-      localStorage.setItem(STORAGE_KEY, next);
-      return next;
-    });
-  };
-
-  return { theme, toggle };
+  const value = useSyncExternalStore(subscribe, () => preference + ':' + resolved(), () => 'system:light');
+  const [choice, theme] = value.split(':');
+  return { preference: choice, theme, setPreference: setThemePreference, toggle: () => setThemePreference(theme === 'dark' ? 'light' : 'dark') };
 }
+export default function useDarkMode() { useEffect(() => { apply(); }, []); }

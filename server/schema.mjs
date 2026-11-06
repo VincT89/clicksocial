@@ -1,5 +1,6 @@
 // Ordine usato anche dalla migrazione: le tabelle figlie seguono users.
-export const TABLES = ['users', 'sessions', 'challenges', 'posts', 'files', 'ai_logs', 'social_connections', 'oauth_states', 'oauth_identities', 'stripe_events', 'mail'];
+export const SCHEMA_VERSION = 2;
+export const TABLES = ['users', 'sessions', 'challenges', 'posts', 'files', 'media_uploads', 'ai_logs', 'social_connections', 'oauth_states', 'oauth_identities', 'stripe_events', 'mail'];
 
 export const SQLITE_SCHEMA = `
   CREATE TABLE IF NOT EXISTS users (
@@ -12,13 +13,15 @@ export const SQLITE_SCHEMA = `
   CREATE TABLE IF NOT EXISTS posts (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, data TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
   CREATE INDEX IF NOT EXISTS posts_user ON posts(user_id,created_at);
   CREATE TABLE IF NOT EXISTS files (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, mime TEXT NOT NULL, name TEXT NOT NULL, size INTEGER NOT NULL, created_at TEXT NOT NULL);
+  CREATE INDEX IF NOT EXISTS files_user_created ON files(user_id,created_at,id);
+  CREATE TABLE IF NOT EXISTS media_uploads (file_id TEXT PRIMARY KEY REFERENCES files(id) ON DELETE CASCADE);
   CREATE TABLE IF NOT EXISTS ai_logs (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, data TEXT NOT NULL, created_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS social_connections (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, encrypted TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS oauth_states (hash TEXT PRIMARY KEY, provider TEXT NOT NULL, data TEXT NOT NULL, expires INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS oauth_identities (provider TEXT NOT NULL, subject TEXT NOT NULL, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, PRIMARY KEY(provider,subject));
   CREATE TABLE IF NOT EXISTS stripe_events (id TEXT PRIMARY KEY, created_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS mail (id TEXT PRIMARY KEY, recipient TEXT NOT NULL, subject TEXT NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL);
-  PRAGMA user_version=1;
+  PRAGMA user_version=${SCHEMA_VERSION};
 `;
 
 const engine = 'ENGINE=InnoDB DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin';
@@ -42,6 +45,7 @@ export const MYSQL_SCHEMA = [
     INDEX posts_user (user_id,created_at), CHECK (JSON_VALID(data))) ${engine}`,
   `CREATE TABLE IF NOT EXISTS files (id ${id} PRIMARY KEY, user_id ${id} NOT NULL, mime VARCHAR(100) NOT NULL, name VARCHAR(200) NOT NULL,
     size BIGINT NOT NULL, created_at ${date} NOT NULL, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE) ${engine}`,
+  `CREATE TABLE IF NOT EXISTS media_uploads (file_id ${id} PRIMARY KEY, FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE) ${engine}`,
   `CREATE TABLE IF NOT EXISTS ai_logs (id ${id} PRIMARY KEY, user_id ${id} NOT NULL, data LONGTEXT NOT NULL, created_at ${date} NOT NULL,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE, INDEX ai_logs_created (created_at), CHECK (JSON_VALID(data))) ${engine}`,
   `CREATE TABLE IF NOT EXISTS social_connections (user_id ${id} PRIMARY KEY, encrypted LONGTEXT NOT NULL,

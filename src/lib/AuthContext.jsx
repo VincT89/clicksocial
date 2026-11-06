@@ -14,9 +14,9 @@ export function AuthProvider({ children }) {
     catch (error) { setUser(null); setAuthError(error.status === 401 ? null : { type: 'unknown', message: error.message }); }
     finally { setAuthChecked(true); setIsLoadingAuth(false); }
   }, []);
-  const checkAppState = useCallback(async () => {
-    setIsLoadingPublicSettings(true);
-    setIsLoadingAuth(true);
+  const checkAppState = useCallback(async ({ silent = false } = {}) => {
+    /** Un aggiornamento in background conserva la bozza e i componenti già montati. */
+    if (!silent) { setIsLoadingPublicSettings(true); setIsLoadingAuth(true); }
     const [settings, account] = await Promise.allSettled([api.app.getPublicSettings(), api.auth.me()]);
     if (settings.status === 'fulfilled') setAppPublicSettings(settings.value);
     if (account.status === 'fulfilled') setUser(account.value);

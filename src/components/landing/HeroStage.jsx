@@ -1,3 +1,5 @@
+import { useI18n } from '@/lib/i18n';
+import { translate as translateUI } from '@/lib/i18n';
 import { useEffect, useId, useRef, useState } from 'react';
 import { BatteryFull, Bookmark, Heart, Home, MessageCircle, MoreHorizontal, PlusSquare, Search, Send, Wifi } from 'lucide-react';
 import './PhoneMockup.css';
@@ -6,7 +8,8 @@ const FEED_IMAGE = '/assets/5b4eb4267_generated_image.png';
 const BRAND_IMAGE = '/assets/55edd6a0a_generated_image.png';
 const BODY_LAYERS = Array.from({ length: 25 }, (_, index) => index);
 
-export function PhoneMockup({ image = FEED_IMAGE, caption = 'Una foto, una storia, il tono giusto.', straight = false, interactive = false }) {
+export function PhoneMockup({ image = FEED_IMAGE, caption = undefined, straight = false, interactive = false }) {
+  useI18n();
   const instructionId = useId();
   const [rotation, setRotation] = useState({ x: 6, y: 24 });
   const [dragging, setDragging] = useState(false);
@@ -59,8 +62,8 @@ export function PhoneMockup({ image = FEED_IMAGE, caption = 'Una foto, una stori
     'aria-describedby': instructionId,
   } : {};
 
-  return <div className={`iphone-scene${straight ? ' iphone-scene--front' : ''}${interactive ? ' iphone-scene--interactive' : ''}${dragging ? ' is-dragging' : ''}`} role={interactive ? 'group' : 'img'} aria-label="iPhone 15 Plus nero in 3D" data-rotation-x={rotation.x} data-rotation-y={rotation.y} {...interaction}>
-    {interactive && <span id={instructionId} className="sr-only">Trascina per ruotare l’iPhone, anche sul retro. Puoi usare le frecce della tastiera. Doppio clic, Home o Esc ripristinano la posizione. Sullo schermo è mostrato un post dimostrativo.</span>}
+  return <div className={`iphone-scene${straight ? ' iphone-scene--front' : ''}${interactive ? ' iphone-scene--interactive' : ''}${dragging ? ' is-dragging' : ''}`} role={interactive ? 'group' : 'img'} aria-label={translateUI("iPhone 15 Plus nero in 3D")} data-rotation-x={rotation.x} data-rotation-y={rotation.y} {...interaction}>
+    {interactive && <span id={instructionId} className="sr-only">{translateUI("Trascina per ruotare l’iPhone, anche sul retro. Puoi usare le frecce della tastiera. Doppio clic, Home o Esc ripristinano la posizione. Sullo schermo è mostrato un post dimostrativo.")}</span>}
     <div className="iphone-model" style={interactive ? { transform: `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg) rotateZ(-9deg)` } : undefined} aria-hidden="true">
       {BODY_LAYERS.map(layer => <div key={layer} className="iphone-body-layer" style={{ transform: `translateZ(-${layer * 10 / 24}cqi)` }} />)}
       <div className="iphone-rail iphone-rail--left">
@@ -91,10 +94,10 @@ export function PhoneMockup({ image = FEED_IMAGE, caption = 'Una foto, una stori
             </div>
             <div className="iphone-island"><span /></div>
             <div className="iphone-feed-header"><span>Instagram</span><Heart /><Send /></div>
-            <div className="iphone-account"><img src={BRAND_IMAGE} alt="" /><div><strong>il_tuo_brand</strong><span>Il tuo spazio creativo</span></div><MoreHorizontal /></div>
+            <div className="iphone-account"><img src={BRAND_IMAGE} alt="" /><div><strong>{translateUI("il_tuo_brand")}</strong><span>{translateUI("Il tuo spazio creativo")}</span></div><MoreHorizontal /></div>
             <div className="iphone-photo"><img src={image} alt="" fetchPriority="high" decoding="async" /></div>
             <div className="iphone-post-actions"><Heart /><MessageCircle /><Send /><Bookmark /></div>
-            <p className="iphone-caption"><strong>il_tuo_brand</strong> {caption}</p>
+            <p className="iphone-caption"><strong>{translateUI("il_tuo_brand")}</strong> {caption ?? translateUI("Una foto, una storia, il tono giusto.")}</p>
             <div className="iphone-feed-tabs"><Home /><Search /><PlusSquare /><Send /><img src={BRAND_IMAGE} alt="" /></div>
             <div className="iphone-home-indicator"><span /></div>
           </div>
@@ -105,6 +108,7 @@ export function PhoneMockup({ image = FEED_IMAGE, caption = 'Una foto, una stori
 }
 
 export default function HeroStage() {
+  useI18n();
   return <figure className="iphone-stage">
     <PhoneMockup interactive />
   </figure>;

@@ -1,7 +1,9 @@
+import { useI18n, translate as translateUI } from '@/lib/i18n';
 import { useRef } from 'react';
 import { ELEMENT_LABELS, changeElement, moveBox, scaleElement } from '../../../shared/designElements.mjs';
 
 export default function ElementOverlay({ design, onChange, layout, selected, onSelect, disabled }) {
+  useI18n();
   const frame = useRef(null), drag = useRef(null);
   const start = (event, role, resize = false) => {
     if (disabled || event.button !== 0 || drag.current) return;
@@ -48,14 +50,14 @@ export default function ElementOverlay({ design, onChange, layout, selected, onS
     } else onChange(changeElement(design, role, moveBox(box, box.x + direction[0] * step, box.y + direction[1] * step)));
   };
   return <div ref={frame} className="studio-elements" onPointerDown={event => { if (event.target === event.currentTarget) onSelect(''); }}>
-    <p id="studio-element-help" className="sr-only">Trascina per spostare. Usa la maniglia per ridimensionare. Con la tastiera usa le frecce per spostare, più e meno per la dimensione. Gli stessi controlli sono nelle impostazioni.</p>
+    <p id="studio-element-help" className="sr-only">{translateUI("Trascina per spostare. Usa la maniglia per ridimensionare. Con la tastiera usa le frecce per spostare, più e meno per la dimensione. Gli stessi controlli sono nelle impostazioni.")}</p>
     {Object.entries(ELEMENT_LABELS).map(([role, label]) => {
       const item = layout[role];
       if (!item?.visible) return null;
       const box = item.box, active = selected === role;
       return <div key={role} className={'studio-element' + (active ? ' is-selected' : '')} style={{ left: box.x * 100 + '%', top: box.y * 100 + '%', width: box.width * 100 + '%', height: box.height * 100 + '%', zIndex: active ? 3 : 1 }}>
-        <button type="button" className="studio-element-move" disabled={disabled} aria-label={'Sposta ' + label.toLowerCase()} aria-pressed={active} aria-describedby="studio-element-help" onFocus={() => onSelect(role)} onPointerDown={event => start(event, role)} onPointerMove={move} onPointerUp={finish} onPointerCancel={finish} onLostPointerCapture={() => { drag.current = null; }} onClick={() => onSelect(role)} onKeyDown={event => keyboard(event, role)} />
-        {active && !disabled && <button type="button" className="studio-element-resize" aria-label={'Ridimensiona ' + label.toLowerCase()} aria-describedby="studio-element-help" onPointerDown={event => start(event, role, true)} onPointerMove={move} onPointerUp={finish} onPointerCancel={finish} onLostPointerCapture={() => { drag.current = null; }} onKeyDown={event => keyboard(event, role, true)}><span /></button>}
+        <button type="button" className="studio-element-move" disabled={disabled} aria-label={translateUI("Sposta ") + translateUI(label).toLowerCase()} aria-pressed={active} aria-describedby="studio-element-help" onFocus={() => onSelect(role)} onPointerDown={event => start(event, role)} onPointerMove={move} onPointerUp={finish} onPointerCancel={finish} onLostPointerCapture={() => { drag.current = null; }} onClick={() => onSelect(role)} onKeyDown={event => keyboard(event, role)} />
+        {active && !disabled && <button type="button" className="studio-element-resize" aria-label={translateUI("Ridimensiona ") + translateUI(label).toLowerCase()} aria-describedby="studio-element-help" onPointerDown={event => start(event, role, true)} onPointerMove={move} onPointerUp={finish} onPointerCancel={finish} onLostPointerCapture={() => { drag.current = null; }} onKeyDown={event => keyboard(event, role, true)}><span /></button>}
       </div>;
     })}
   </div>;

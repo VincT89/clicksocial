@@ -5,6 +5,8 @@ import { useAuth } from './AuthContext';
 import { Preferences } from '@capacitor/preferences';
 import { App } from '@capacitor/app';
 import { restoreStudioDraft, draftStorageKey } from './studioDraft.mjs';
+import { isIPhonePreview, previewMessage, sendPreviewMessage } from './iphonePreview';
+import { translate } from './i18n';
 import { toast } from 'sonner';
 import { DEFAULT_MODE } from '../../shared/postDefaults.mjs';
 
@@ -16,7 +18,8 @@ export function StudioStateProvider({ children }) {
   const { user } = useAuth();
   const storageKey = user?.id ? draftStorageKey(apiOrigin, user.id) : '';
   const [hydratedKey, setHydratedKey] = useState('');
-  const ready = !isNative || !storageKey || hydratedKey === storageKey;
+  const [previewReady, setPreviewReady] = useState(!isIPhonePreview());
+  const ready = (!isNative || !storageKey || hydratedKey === storageKey) && previewReady;
   const latestDraft = useRef(null);
   const storageQueue = useRef(Promise.resolve());
   const storageWarning = useRef(false);
@@ -39,12 +42,42 @@ export function StudioStateProvider({ children }) {
   const [planning, setPlanning] = useState(null);
   const [editorialAt, setEditorialAt] = useState(null);
 
+  const previewDraft = { originalUrl, platform, tone, mode, title, context, copy, filters, activePreset, editingId, postStatus, design, planning, editorialAt };
+  const previewState = useRef(null);
+  previewState.current = { userId: user?.id || null, draft: previewDraft, generating };
+  const applyPreviewDraft = saved => {
+    if (!saved || typeof saved !== 'object') return;
+    draftRevision.current++;
+    setOriginalUrl(saved.originalUrl); setPlatform(saved.platform); setTone(saved.tone); setMode(saved.mode);
+    setTitle(saved.title); setContext(saved.context); setCopy(saved.copy); setFilters(saved.filters);
+    setActivePreset(saved.activePreset); setEditingId(saved.editingId); setPostStatus(saved.postStatus);
+    setDesign(saved.design); setPlanning(saved.planning); setEditorialAt(saved.editorialAt);
+  };
+  /** La bozza passa solo tra il contenitore e il suo iframe della stessa origine, senza nuova memoria persistente. */
+  useEffect(() => {
+    if (!isIPhonePreview()) return;
+    const receive = event => {
+      if (!previewMessage(event, window.parent)) return;
+      if (event.data.type === 'restore') {
+        if (event.data.userId === previewState.current.userId && event.data.draft) applyPreviewDraft(event.data.draft);
+        setPreviewReady(true);
+      }
+      if (event.data.type === 'request-close') sendPreviewMessage(window.parent, 'close-state', previewState.current);
+    };
+    window.addEventListener('message', receive);
+    sendPreviewMessage(window.parent, 'ready', { userId: user?.id || null });
+    return () => window.removeEventListener('message', receive);
+  }, [user?.id]);
+  useEffect(() => {
+    if (isIPhonePreview() && previewReady) sendPreviewMessage(window.parent, 'state', previewState.current);
+  }, [previewReady, user?.id, originalUrl, platform, tone, mode, title, context, copy, filters, activePreset, editingId, postStatus, design, planning, editorialAt, generating]);
+
   const persist = record => {
     if (!record?.key) return;
     storageQueue.current = storageQueue.current.catch(() => {}).then(() => record.data.originalUrl || record.data.planning
       ? Preferences.set({ key: record.key, value: JSON.stringify({ version: 1, ...record.data }) })
       : Preferences.remove({ key: record.key })).catch(() => {
-      if (!storageWarning.current) toast.error('Non riesco a conservare la bozza sul dispositivo. Salva il post nella Libreria prima di chiudere.');
+      if (!storageWarning.current) toast.error(translate('Non riesco a conservare la bozza sul dispositivo. Salva il post nella Libreria prima di chiudere.'));
       storageWarning.current = true;
     });
   };
@@ -68,7 +101,7 @@ export function StudioStateProvider({ children }) {
         setActivePreset(saved.activePreset); setEditingId(saved.editingId); setPostStatus(saved.postStatus);
         setDesign(saved.design); setPlanning(saved.planning); setEditorialAt(saved.editorialAt);
       }
-    }).catch(() => toast.error('Non riesco a recuperare la bozza sul dispositivo.')).finally(() => { if (active) setHydratedKey(storageKey); });
+    }).catch(() => toast.error(translate('Non riesco a recuperare la bozza sul dispositivo.'))).finally(() => { if (active) setHydratedKey(storageKey); });
     return () => { active = false; };
   }, [storageKey]);
 
@@ -101,9 +134,16 @@ export function StudioStateProvider({ children }) {
     setDesign(null); setPlanning(null); setEditorialAt(null);
   };
 
+  const previousUser = useRef(user?.id);
+  useEffect(() => {
+    if (previousUser.current !== user?.id) resetDraft();
+    previousUser.current = user?.id;
+  }, [user?.id]);
+
   return (
     <StudioStateContext.Provider
       value={{
+        previewDraft, applyPreviewDraft,
         originalUrl,
         setOriginalUrl,
         platform,
@@ -135,7 +175,7 @@ export function StudioStateProvider({ children }) {
         design, setDesign, planning, setPlanning, editorialAt, setEditorialAt,
       }}
     >
-      {ready ? children : <p role="status" className="p-6 text-sm text-muted-foreground">Recupero della bozza…</p>}
+      {ready ? children : <p role="status" className="p-6 text-sm text-muted-foreground">{translate('Recupero della bozza…')}</p>}
     </StudioStateContext.Provider>
   );
 }

@@ -3,11 +3,13 @@ import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { TABLES, mysqlTables, initializeMySQL } from './database.mjs';
+import { SCHEMA_VERSION } from './schema.mjs';
 
 const COLUMNS = {
   users: ['id','email','password','verified','role','plan','ai_used','profile','stripe_customer_id','stripe_subscription_id','created_at'],
   sessions: ['hash','user_id','expires'], challenges: ['email','purpose','hash','expires','attempts'],
   posts: ['id','user_id','data','created_at','updated_at'], files: ['id','user_id','mime','name','size','created_at'],
+  media_uploads: ['file_id'],
   ai_logs: ['id','user_id','data','created_at'], social_connections: ['user_id','encrypted'],
   oauth_states: ['hash','provider','data','expires'], oauth_identities: ['provider','subject','user_id'],
   stripe_events: ['id','created_at'], mail: ['id','recipient','subject','body','created_at'],
@@ -19,10 +21,13 @@ export function sqliteSnapshot(config) {
   const db = new DatabaseSync(file, { readOnly: true, timeout: 5000 });
   try {
     db.exec('BEGIN');
-    if (db.prepare('PRAGMA user_version').get().user_version !== 1) throw new Error('Versione SQLite non supportata dalla migrazione.');
+    const version = db.prepare('PRAGMA user_version').get().user_version;
+    if (![1, SCHEMA_VERSION].includes(version)) throw new Error('Versione SQLite non supportata dalla migrazione.');
     const rows = {}, counts = {};
     for (const table of TABLES) {
       const columns = db.prepare('PRAGMA table_info(' + table + ')').all().map(row => row.name);
+      /** Una copia v1 precedente alla Libreria media può essere migrata direttamente, senza modificarla. */
+      if (version === 1 && table === 'media_uploads' && !columns.length) { rows[table] = []; counts[table] = 0; continue; }
       if (JSON.stringify(columns) !== JSON.stringify(COLUMNS[table])) throw new Error('Struttura della tabella SQLite non riconosciuta: ' + table);
       rows[table] = db.prepare('SELECT * FROM ' + table).all();
       counts[table] = rows[table].length;
@@ -43,7 +48,7 @@ export async function assertEmptyMySQL(db, config) {
   if (names.length && !names.includes('clicksocial_meta')) throw new Error('La destinazione contiene già tabelle estranee a ClickSocial. Usa un database dedicato e vuoto.');
   if (names.includes('clicksocial_meta')) {
     const meta = await db.prepare('SELECT * FROM clicksocial_meta WHERE id=1').get();
-    if (meta && ![0,1].includes(meta.schema_version)) throw new Error('Versione della destinazione non supportata.');
+    if (meta && ![0,1,SCHEMA_VERSION].includes(meta.schema_version)) throw new Error('Versione della destinazione non supportata.');
     const hash = createHash('sha256').update(config.encryptionKey).digest('hex');
     if (meta && meta.key_hash !== hash) throw new Error('La destinazione usa una chiave di cifratura diversa.');
   }

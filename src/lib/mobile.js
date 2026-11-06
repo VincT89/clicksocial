@@ -71,7 +71,8 @@ export async function nativeUpload(file, kind = 'image') {
   const path = 'clicksocial-upload-' + crypto.randomUUID() + '.' + extension;
   const saved = await Filesystem.writeFile({ path, directory: Directory.Cache, data: await fileToBase64(file) });
   try {
-    const result = await FileTransfer.uploadFile({ url: apiUrl(font ? '/api/fonts' : '/api/files'), path: saved.uri,
+    const endpoint = font ? '/api/fonts' : kind === 'media' ? '/api/media' : '/api/files';
+    const result = await FileTransfer.uploadFile({ url: apiUrl(endpoint), path: saved.uri,
       headers: await nativeHeaders({ 'Content-Type': contentType, 'X-File-Name': encodeURIComponent(file.name || 'immagine') }),
       readTimeout: 120000, connectTimeout: 15000, chunkedMode: false, disableRedirects: true,
     });

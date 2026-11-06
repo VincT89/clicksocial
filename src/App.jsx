@@ -8,8 +8,14 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
+const Home = lazy(() => import('@/pages/Home'));
+const BrandPreferences = lazy(() => import('@/pages/BrandPreferences'));
+const Preferences = lazy(() => import('@/pages/Preferences'));
+const Statistics = lazy(() => import('@/pages/Statistics'));
+const Help = lazy(() => import('@/pages/Help'));
 const Studio = lazy(() => import('@/pages/Studio'));
 const Library = lazy(() => import('@/pages/Library'));
+const MediaLibrary = lazy(() => import('@/pages/MediaLibrary'));
 const Landing = lazy(() => import('@/pages/Landing'));
 const Login = lazy(() => import('@/pages/Login'));
 const Register = lazy(() => import('@/pages/Register'));
@@ -22,11 +28,13 @@ const Sviluppatore = lazy(() => import('@/pages/Sviluppatore'));
 import ProtectedRoute from '@/components/ProtectedRoute';
 import MobileLayout from '@/components/MobileLayout';
 import { TourProvider } from '@/lib/TourContext';
-import useDarkMode from '@/hooks/useDarkMode';
+import useDarkMode, { useTheme } from '@/hooks/useDarkMode';
+import { useI18n } from '@/lib/i18n';
 import { TooltipProvider } from '@/components/ui/tooltip';
 // Add page imports here
 
 const AuthenticatedApp = () => {
+  const { t } = useI18n();
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, checkAppState } = useAuth();
 
   // Show loading spinner while checking app public settings or auth
@@ -40,7 +48,7 @@ const AuthenticatedApp = () => {
 
   // Handle authentication errors
   if (authError) {
-    if (authError.type === 'unknown') return <main className="max-w-md mx-auto px-6 py-16" role="alert"><h1 className="font-heading text-2xl">Connessione all’app non disponibile</h1><p className="text-sm text-muted-foreground my-4">{authError.message}</p><button onClick={checkAppState} className="rounded-xl bg-primary text-primary-foreground px-5 py-3">Riprova</button></main>;
+    if (authError.type === 'unknown') return <main className="max-w-md mx-auto px-6 py-16" role="alert"><h1 className="font-heading text-2xl">{t("Connessione all’app non disponibile")}</h1><p className="text-sm text-muted-foreground my-4">{t(authError.message)}</p><button onClick={checkAppState} className="rounded-xl bg-primary text-primary-foreground px-5 py-3">{t("Riprova")}</button></main>;
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
@@ -69,11 +77,18 @@ const AuthenticatedApp = () => {
         <Route path="/" element={<Landing />} />
         <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
           <Route path="/configura-azienda" element={<BusinessSetup />} />
+          <Route path="/home" element={<Home />} />
+          <Route path="/calendario" element={<Library calendar />} />
+          <Route path="/impostazioni" element={<BrandPreferences />} />
+          <Route path="/preferenze" element={<Preferences />} />
+          <Route path="/statistiche" element={<Statistics />} />
+          <Route path="/assistenza" element={<Help />} />
           <Route path="/profilo" element={<Profile />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/sviluppatore" element={<Sviluppatore />} />
           <Route path="/studio" element={<Studio />} />
           <Route path="/library" element={<Library />} />
+          <Route path="/media" element={<MediaLibrary />} />
         </Route>
       </Route>
       <Route path="*" element={<PageNotFound />} />
@@ -84,12 +99,13 @@ const AuthenticatedApp = () => {
 
 
 function AppNotifications() {
+  const { theme } = useTheme();
   const { pathname } = useLocation();
   const { isAuthenticated } = useAuth();
-  const bottom = isAuthenticated ? 'calc(var(--app-tab-space) + 16px)' : 'calc(env(safe-area-inset-bottom) + 16px)';
-  return <SonnerToaster className="app-notifications" position={pathname === '/studio' ? 'top-center' : 'bottom-right'}
-    offset={{ top: 'calc(80px + env(safe-area-inset-top))', bottom, left: 'max(24px, env(safe-area-inset-left))', right: 'max(24px, env(safe-area-inset-right))' }}
-    mobileOffset={{ top: 'calc(80px + env(safe-area-inset-top))', bottom, left: 'max(16px, env(safe-area-inset-left))', right: 'max(16px, env(safe-area-inset-right))' }} />;
+  const bottom = isAuthenticated ? 'calc(var(--app-tab-space) + 16px)' : 'calc(var(--app-safe-bottom,env(safe-area-inset-bottom)) + 16px)';
+  return <SonnerToaster theme={theme} className="app-notifications" position={pathname === '/studio' ? 'top-center' : 'bottom-right'}
+    offset={{ top: 'calc(80px + var(--app-safe-top,env(safe-area-inset-top)))', bottom, left: 'max(24px, var(--app-safe-left,env(safe-area-inset-left)))', right: 'max(24px, var(--app-safe-right,env(safe-area-inset-right)))' }}
+    mobileOffset={{ top: 'calc(80px + var(--app-safe-top,env(safe-area-inset-top)))', bottom, left: 'max(16px, var(--app-safe-left,env(safe-area-inset-left)))', right: 'max(16px, var(--app-safe-right,env(safe-area-inset-right)))' }} />;
 }
 
 function App() {

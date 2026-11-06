@@ -1,3 +1,4 @@
+import { useI18n, translate as translateUI } from '@/lib/i18n';
 import { useAuth } from '@/lib/AuthContext';
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
@@ -13,6 +14,7 @@ import { toast } from "@/components/ui/use-toast";
 import { safeReturnTo } from "@/lib/authReturnTo";
 
 export default function Register() {
+  useI18n();
   const { appPublicSettings } = useAuth();
   const localSettings = appPublicSettings?.public_settings || {};
   const [email, setEmail] = useState("");
@@ -60,8 +62,8 @@ export default function Register() {
     try {
       await api.auth.resendOtp(email);
       toast({
-        title: "Codice inviato",
-        description: localSettings.localMail ? "Apri la posta locale per il nuovo codice." : "Controlla la tua email per il nuovo codice.",
+        title: translateUI("Codice inviato"),
+        description: translateUI(localSettings.localMail ? "Apri la posta locale per il nuovo codice." : "Controlla la tua email per il nuovo codice."),
       });
     } catch (err) {
       setError(err.message || "Invio non riuscito");
@@ -78,22 +80,22 @@ export default function Register() {
     return (
       <SplitAuth
         theme="pink"
-        label="Il tuo archivio creativo"
-        title="Verifica la tua email."
-        text={localSettings.localMail ? `Il codice per ${email} si trova nella posta locale.` : `Abbiamo inviato un codice a ${email}.`}
+        label={translateUI("Il tuo archivio creativo")}
+        title={translateUI("Verifica la tua email.")}
+        text={translateUI(localSettings.localMail ? "Il codice per {email} si trova nella posta locale." : "Abbiamo inviato un codice a {email}.", { email })}
       >
-        <h2 className="font-heading text-2xl font-bold tracking-tight">Inserisci il codice</h2>
-        <p className="text-sm text-muted-foreground mt-1 mb-6">
-          Sei a un passo dal tuo studio. {localSettings.localMail && <a href="/dev/mail" target="_blank" rel="noreferrer" className="underline">Apri posta locale</a>}
+        <h1 className="font-heading text-2xl font-bold tracking-tight">{translateUI("Inserisci il codice")}</h1>
+        <p className="text-sm text-muted-foreground mt-1 mb-6">{translateUI("Sei a un passo dal tuo studio.")}{localSettings.localMail && <a href="/dev/mail" target="_blank" rel="noreferrer" className="underline">{translateUI("Apri posta locale")}</a>}
         </p>
 
         {error && (
-          <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-            {error}
+          <div role="alert" className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+            {translateUI(error)}
           </div>
         )}
         <div className="flex justify-center mb-6">
           <InputOTP
+            aria-label={translateUI("Codice di verifica")}
             maxLength={6}
             value={otpCode}
             onChange={setOtpCode}
@@ -117,18 +119,13 @@ export default function Register() {
         >
           {loading ? (
             <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Verifica in corso…
-            </>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />{translateUI("Verifica in corso…")}</>
           ) : (
-            "Verifica e continua"
+            translateUI("Verifica e continua")
           )}
         </Button>
-        <p className="text-center text-sm text-muted-foreground mt-4">
-          Non hai ricevuto il codice?{" "}
-          <button onClick={handleResend} className="text-primary font-medium hover:underline">
-            Invia di nuovo
-          </button>
+        <p className="text-center text-sm text-muted-foreground mt-4">{translateUI("Non hai ricevuto il codice?")}{" "}
+          <button onClick={handleResend} className="text-primary font-medium hover:underline">{translateUI("Invia di nuovo")}</button>
         </p>
       </SplitAuth>
     );
@@ -137,24 +134,21 @@ export default function Register() {
   return (
     <SplitAuth
       theme="pink"
-      label="Il tuo archivio creativo"
-      title="Uno spazio per le foto che meritano di diventare contenuti."
-      text="I social sono facoltativi. Per creare, salvare e scaricare basta il tuo account."
+      label={translateUI("Il tuo archivio creativo")}
+      title={translateUI("Uno spazio per le foto che meritano di diventare contenuti.")}
+      text={translateUI("I social sono facoltativi. Per creare, salvare e scaricare basta il tuo account.")}
       footer={
-        <>
-          Hai già un account?{" "}
+        <>{translateUI("Hai già un account?")}{" "}
           <Link
             to={"/login" + (safeReturnTo() !== "/" ? "?returnTo=" + encodeURIComponent(safeReturnTo()) : "")}
             className="text-primary font-medium hover:underline"
-          >
-            Accedi
-          </Link>
+          >{translateUI("Accedi")}</Link>
         </>
       }
     >
-      <h2 className="font-heading text-2xl font-bold tracking-tight">Registrati</h2>
-      <p className="text-sm text-muted-foreground mt-1 mb-6">Crea il tuo spazio creativo.</p>
-      {localSettings.firstAccountAdmin && <p className="text-sm text-muted-foreground mb-4">Il primo account verificato in questa installazione locale sarà amministratore.</p>}
+      <h1 className="font-heading text-2xl font-bold tracking-tight">{translateUI("Registrati")}</h1>
+      <p className="text-sm text-muted-foreground mt-1 mb-6">{translateUI("Crea il tuo spazio creativo.")}</p>
+      {localSettings.firstAccountAdmin && <p className="text-sm text-muted-foreground mb-4">{translateUI("Il primo account verificato in questa installazione locale sarà amministratore.")}</p>}
 
       <Button
         variant="outline"
@@ -162,28 +156,26 @@ export default function Register() {
         onClick={handleGoogle}
         disabled={!localSettings.googleEnabled}
       >
-        <GoogleIcon className="w-5 h-5 mr-2" />
-        Continua con Google
-      </Button>
+        <GoogleIcon className="w-5 h-5 mr-2" />{translateUI("Continua con Google")}</Button>
 
       <div className="relative mb-6">
         <div className="absolute inset-0 flex items-center">
           <div className="w-full border-t border-border" />
         </div>
         <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-background px-3 text-muted-foreground">oppure</span>
+          <span className="bg-background px-3 text-muted-foreground">{translateUI("oppure")}</span>
         </div>
       </div>
 
       {error && (
-        <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-          {error}
+        <div role="alert" className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+          {translateUI(error)}
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">{translateUI("Email")}</Label>
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
             <Input
@@ -191,7 +183,7 @@ export default function Register() {
               type="email"
               autoComplete="email"
               autoFocus
-              placeholder="nome@esempio.it"
+              placeholder={translateUI("nome@esempio.it")}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="pl-10 h-12"
@@ -200,7 +192,7 @@ export default function Register() {
           </div>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password">{translateUI("Password")}</Label>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
             <Input
@@ -217,7 +209,7 @@ export default function Register() {
           </div>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="confirm">Conferma password</Label>
+          <Label htmlFor="confirm">{translateUI("Conferma password")}</Label>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
             <Input
@@ -235,11 +227,9 @@ export default function Register() {
         <Button type="submit" className="w-full h-12 font-medium rounded-full" disabled={loading}>
           {loading ? (
             <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Creazione in corso…
-            </>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />{translateUI("Creazione in corso…")}</>
           ) : (
-            "Continua con l'azienda"
+            translateUI("Continua con l'azienda")
           )}
         </Button>
       </form>

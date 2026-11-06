@@ -23,6 +23,12 @@ const entity = name => ({
   update: (id, data) => send('/entities/' + name + '/' + encodeURIComponent(id), data, 'PATCH'),
   delete: id => send('/entities/' + name + '/' + encodeURIComponent(id), {}, 'DELETE'),
 });
+function uploadImage(file, media = false) {
+  if (isNative) return nativeUpload(file, media ? 'media' : 'image');
+  return request(media ? '/media' : '/files', {
+    method:'POST', headers:{ 'Content-Type':file.type || 'application/octet-stream', 'X-File-Name':encodeURIComponent(file.name || 'immagine') }, body:file,
+  });
+}
 export const api = {
   app: { getPublicSettings: () => request('/settings') },
   auth: {
@@ -40,7 +46,15 @@ export const api = {
   },
   entities: { Post: entity('Post'), User: entity('User'), AiLog: entity('AiLog') },
   functions: { invoke: async (name, data = {}) => ({ data: await send('/functions/' + name, data) }) },
-  integrations: { Core: { UploadFile: async ({ file }) => isNative ? nativeUpload(file) : request('/files', { method: 'POST', headers: { 'Content-Type': file.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(file.name || 'immagine') }, body: file }) } },
+  integrations: { Core: { UploadFile: ({ file }) => uploadImage(file) } },
+  media: {
+    list: (kind, cursor = null) => {
+      const params = new URLSearchParams({ kind });
+      if (cursor) params.set('cursor', cursor);
+      return request('/media?' + params);
+    },
+    upload: file => uploadImage(file, true),
+  },
   brand: { uploadFont: file => isNative ? nativeUpload(file, 'font') : request('/fonts', { method: 'POST', headers: { 'Content-Type': file.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(file.name) }, body: file }) },
   social: {
     status: () => request('/social/status'),

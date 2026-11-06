@@ -25,6 +25,11 @@ export function editorialDate(post) {
   const value = post.editorial_at || post.scheduled_at || post.published_at;
   return value && dayKey(value) ? value : null;
 }
+export function scheduledTime(post) {
+  /** Una data editoriale può appartenere a una semplice idea. Solo la coda con un orario valido indica un invio programmato. */
+  const time = post.status === 'in_coda' ? Date.parse(post.scheduled_at) : NaN;
+  return Number.isFinite(time) ? time : Infinity;
+}
 export function editorialStage(post) {
   if (post.status === 'da_verificare') return post.status;
   if (post.status === 'in_coda' || post.status === 'in_pubblicazione' || post.status === 'pubblicato' || post.status === 'fallito') return post.status;
@@ -32,5 +37,10 @@ export function editorialStage(post) {
   return post.editorial_at ? 'pianificato' : post.status || 'bozza';
 }
 export const STAGES = { da_preparare:'Da preparare', da_fotografare:'Da fotografare', materiale_disponibile:'Materiale disponibile', post_creato:'Post creato', bozza:'Bozza', pronto:'Pronto', pianificato:'Pianificato', in_coda:'Invio automatico in coda', in_pubblicazione:'Invio in corso', pubblicato:'Pubblicato', fallito:'Invio non riuscito', da_verificare:'Esito da verificare sul social' };
-export const PLATFORMS = { instagram:'Instagram', facebook:'Facebook', tiktok:'TikTok' };
+export const PLATFORMS = { instagram:'Instagram', facebook:'Facebook' };
+
+export function platformLabel(value) {
+  const key = String(value || '').trim().toLowerCase();
+  return Object.hasOwn(PLATFORMS, key) ? PLATFORMS[key] : '';
+}
 

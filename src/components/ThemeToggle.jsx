@@ -1,19 +1,22 @@
+import { useI18n, translate as translateUI } from '@/lib/i18n';
 import { Sun, Moon } from "lucide-react";
 import { useTheme } from "@/hooks/useDarkMode";
 import IconHint from "@/components/IconHint";
 
 // Toggle tema chiaro/scuro. Persiste la scelta in localStorage e aggiormentra la classe "dark".
-export default function ThemeToggle({ className = "" }) {
+export default function ThemeToggle({ className = "", withLabel = false }) {
+  useI18n();
   const { theme, toggle } = useTheme();
   const isDark = theme === "dark";
   return (
-    <IconHint label={isDark ? "Passa al tema chiaro" : "Passa al tema scuro"}><button
+    <IconHint label={isDark ? translateUI("Passa al tema chiaro") : translateUI("Passa al tema scuro")}><button
       type="button"
       onClick={toggle}
-      aria-label={isDark ? "Passa al tema chiaro" : "Passa al tema scuro"}
-      className={`nav-icon ${className}`}
+      aria-label={isDark ? translateUI("Passa al tema chiaro") : translateUI("Passa al tema scuro")}
+      className={`nav-icon ${withLabel ? "nav-labeled" : ""} ${className}`}
     >
       {isDark ? <Sun className="w-5 h-5" aria-hidden="true" /> : <Moon className="w-5 h-5" aria-hidden="true" />}
+      {withLabel && <span>{translateUI("Tema")}</span>}
     </button></IconHint>
   );
 }

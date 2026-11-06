@@ -2,10 +2,12 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { useTour } from '@/lib/TourContext';
 import { Button } from '@/components/ui/button';
+import { useI18n } from '@/lib/i18n';
 import { visibleTourTarget } from '@/lib/tourTargets';
 
 export default function TourOverlay() {
   const { steps, stepIndex, next, prev, skip } = useTour();
+  const { t } = useI18n();
   const step = steps[stepIndex];
   const tip = useRef(null);
   const [position, setPosition] = useState({ left: 12, top: 80 });
@@ -57,15 +59,15 @@ export default function TourOverlay() {
     {rect && <div aria-hidden="true" className="absolute rounded-xl ring-2 ring-primary pointer-events-none" style={rect} />}
     <div ref={tip} tabIndex={-1} role="dialog" aria-modal="false" aria-labelledby="guide-title" aria-describedby="guide-description" className="absolute pointer-events-auto w-80 max-w-[calc(100vw-24px)] max-h-[calc(100dvh-24px)] overflow-y-auto rounded-2xl border border-border bg-card text-card-foreground shadow-xl p-5 focus:outline-none" style={position}>
       <div className="flex items-start justify-between gap-3">
-        <h2 id="guide-title" className="font-heading text-lg font-bold">{step.title}</h2>
-        <button type="button" onClick={skip} aria-label="Chiudi guida" className="-mt-2 -mr-2 h-11 w-11 shrink-0 flex items-center justify-center rounded-lg hover:bg-secondary"><X size={18} /></button>
+        <h2 id="guide-title" className="font-heading text-lg font-bold">{t(step.title)}</h2>
+        <button type="button" onClick={skip} aria-label={t('Chiudi guida')} className="-mt-2 -mr-2 h-11 w-11 shrink-0 flex items-center justify-center rounded-lg hover:bg-secondary"><X size={18} /></button>
       </div>
-      <p id="guide-description" className="text-sm text-muted-foreground leading-relaxed mt-2" aria-live="polite">{step.body}</p>
+      <p id="guide-description" className="text-sm text-muted-foreground leading-relaxed mt-2" aria-live="polite">{t(step.body)}</p>
       <div className="flex flex-wrap items-center justify-between gap-2 mt-5">
-        <span className="text-xs text-muted-foreground">{stepIndex + 1} di {steps.length}</span>
+        <span className="text-xs text-muted-foreground">{t('{current} di {total}', { current: stepIndex + 1, total: steps.length })}</span>
         <div className="flex gap-2">
-          <Button size="sm" className="min-h-11" variant="ghost" disabled={!stepIndex} onClick={prev}>Indietro</Button>
-          <Button size="sm" className="min-h-11" onClick={next}>{stepIndex + 1 === steps.length ? 'Fine' : 'Avanti'}</Button>
+          <Button size="sm" className="min-h-11" variant="ghost" disabled={!stepIndex} onClick={prev}>{t('Indietro')}</Button>
+          <Button size="sm" className="min-h-11" onClick={next}>{t(stepIndex + 1 === steps.length ? 'Fine' : 'Avanti')}</Button>
         </div>
       </div>
     </div>

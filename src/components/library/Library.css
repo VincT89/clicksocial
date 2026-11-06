@@ -1,5 +1,5 @@
 .library-views .section-tab { padding-inline: clamp(3px, 1.4vw, 16px); }
-.library-views .section-tab[aria-pressed="true"] { color: hsl(var(--foreground)); font-weight: 600; }
+.library-views .section-tab[aria-pressed="true"] { color: hsl(var(--primary-foreground)); font-weight: 600; }
 .library-gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 12px; }
 .library-post { min-width: 0; display: flex; flex-direction: column; }
 .library-post-open { min-width: 0; display: block; }
@@ -22,4 +22,22 @@
 @media (min-width: 1024px) {
   .library-gallery { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .library-post-excerpt { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; white-space: pre-wrap; margin-top: 6px; font-size: 14px; color: hsl(var(--muted-foreground)); }
+}
+
+.library-post-tile { border:1px solid hsl(var(--border)); border-radius:12px; background:hsl(var(--card)); overflow:hidden; padding:10px; }
+.library-post-tile .library-post-info { padding:12px 4px 4px; }
+.library-post-cover { border-radius:8px; }
+@media (min-width:1024px) { .library-gallery { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media (min-width:1500px) { .library-gallery { grid-template-columns:repeat(4,minmax(0,1fr)); } }
+
+.library-post-tile,.editorial-calendar { box-shadow:var(--surface-shadow); }
+@media (max-width:639px) {
+  .editorial-calendar { padding:4px 6px 12px; }
+  .calendar-weekdays { border:0; background:transparent; }
+  .calendar-day { height:44px; border:0; padding:2px; align-items:center; justify-content:flex-start; background:transparent; box-shadow:none; }
+  .calendar-day:hover { background:hsl(var(--accent)); }
+  .calendar-date { width:28px; height:28px; font-size:12px; }
+  .calendar-day[aria-current=date] .calendar-date { color:hsl(var(--accent-foreground)); background:hsl(var(--accent)); }
+  [aria-selected=true] > .calendar-day .calendar-date { background:hsl(var(--primary)); color:hsl(var(--primary-foreground)); font-weight:700; }
+  .calendar-day-dot { width:4px; height:4px; border-radius:50%; background:hsl(var(--accent-foreground)); margin-top:3px; }
 }

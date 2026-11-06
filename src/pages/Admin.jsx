@@ -1,3 +1,5 @@
+import { useI18n } from '@/lib/i18n';
+import { translate as translateUI } from '@/lib/i18n';
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/api/client";
@@ -10,6 +12,7 @@ import { isAdminAccount } from "@/lib/adminAccess";
 import WorkspaceHeader from "@/components/WorkspaceHeader";
 
 function SectionCard({ icon: Icon, title, subtitle, children }) {
+  useI18n();
   return (
     <section className="rounded-[28px] bg-card p-6 sm:p-8 pwa-shadow">
       <div className="flex items-center gap-3 mb-5">
@@ -27,6 +30,7 @@ function SectionCard({ icon: Icon, title, subtitle, children }) {
 }
 
 export default function Admin() {
+  useI18n();
   const navigate = useNavigate();
   const [me, setMe] = useState(null);
   const [users, setUsers] = useState(null);
@@ -49,9 +53,9 @@ export default function Admin() {
     try {
       await api.entities.User.update(id, { plan });
       setUsers((us) => us.map((u) => (u.id === id ? { ...u, plan } : u)));
-      toast.success(plan === "pro" ? "Piano Pro attivato" : "Piano riportato a Gratuito");
+      toast.success(plan === "pro" ? translateUI("Piano Pro attivato") : translateUI("Piano riportato a Gratuito"));
     } catch (e) {
-      toast.error("Aggiornamento fallito: " + (e?.response?.data?.error || e.message));
+      toast.error(translateUI("Aggiornamento fallito: ") + (e?.response?.data?.error || e.message));
     }
   };
 
@@ -68,13 +72,9 @@ export default function Admin() {
       <div className="min-h-screen bg-background flex items-center justify-center px-6">
         <div className="text-center max-w-sm">
           <ShieldAlert className="w-10 h-10 text-muted-foreground mx-auto mb-4" />
-          <h1 className="font-heading text-xl font-bold mb-2">Area riservata</h1>
-          <p className="text-sm text-muted-foreground mb-6">
-            Accesso consentito solo all'account aziendale autorizzato.
-          </p>
-          <Button onClick={() => navigate("/studio")} className="rounded-full">
-            Torna allo Studio
-          </Button>
+          <h1 className="font-heading text-xl font-bold mb-2">{translateUI("Area riservata")}</h1>
+          <p className="text-sm text-muted-foreground mb-6">{translateUI("Accesso consentito solo all'account aziendale autorizzato.")}{' '}</p>
+          <Button onClick={() => navigate("/studio")} className="rounded-full">{translateUI("Torna allo Studio")}{' '}</Button>
         </div>
       </div>
     );
@@ -84,44 +84,41 @@ export default function Admin() {
 
   return (
     <div className="min-h-screen bg-background">
-      <WorkspaceHeader subtitle="Area azienda" showGuide={false} />
+      <WorkspaceHeader subtitle={translateUI("Area azienda")} showGuide={false} />
 
       <main className="workspace-main space-y-6">
-        <h1 className="workspace-title">Area azienda</h1>
-        {loadError && <div role="alert" className="text-sm text-destructive"><p>Impossibile caricare i dati: {loadError}</p><Button variant="outline" className="mt-3" onClick={() => setMe({ ...me })}>Riprova</Button></div>}
+        <h1 className="workspace-title">{translateUI("Area azienda")}</h1>
+        {loadError && <div role="alert" className="text-sm text-destructive"><p>{translateUI("Impossibile caricare i dati:")}{' '}{loadError}</p><Button variant="outline" className="mt-3" onClick={() => setMe({ ...me })}>{translateUI("Riprova")}</Button></div>}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="rounded-[24px] bg-card p-6 pwa-shadow">
             <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium mb-1">
-              <Users className="w-4 h-4" /> Account verificati
-            </div>
+              <Users className="w-4 h-4" />{' '}{translateUI("Account verificati")}{' '}</div>
             <strong className="font-heading text-3xl">{users === null ? "…" : users.length}</strong>
           </div>
           <div className="rounded-[24px] bg-card p-6 pwa-shadow">
             <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium mb-1">
-              <Crown className="w-4 h-4" /> Account Pro
-            </div>
+              <Crown className="w-4 h-4" />{' '}{translateUI("Account Pro")}{' '}</div>
             <strong className="font-heading text-3xl">{users === null ? "…" : proCount}</strong>
           </div>
           <div className="rounded-[24px] bg-card p-6 pwa-shadow">
             <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium mb-1">
-              <ImageIcon className="w-4 h-4" /> Post salvati
-            </div>
+              <ImageIcon className="w-4 h-4" />{' '}{translateUI("Post salvati")}{' '}</div>
             <strong className="font-heading text-3xl">{postCount === null ? "…" : postCount}</strong>
           </div>
         </div>
 
         <SectionCard
           icon={Sparkles}
-          title="Connessione AI"
-          subtitle="Stato del motore di generazione dei copy."
+          title={translateUI("Connessione AI")}
+          subtitle={translateUI("Stato del motore di generazione dei copy.")}
         >
           <AiStatusCard />
         </SectionCard>
 
         <SectionCard
           icon={Building2}
-          title="Clienti"
-          subtitle="Elenco dei clienti con piano e generazioni AI utilizzate."
+          title={translateUI("Clienti")}
+          subtitle={translateUI("Elenco dei clienti con piano e generazioni AI utilizzate.")}
         >
           <CustomersTable users={users} onTogglePlan={handleTogglePlan} />
         </SectionCard>

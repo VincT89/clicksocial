@@ -2,20 +2,22 @@ import * as React from "react"
 import { Eye, EyeOff } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { useI18n } from "@/lib/i18n"
 
 const Input = React.forwardRef(/** @param {React.InputHTMLAttributes<HTMLInputElement>} props */ ({ className, type, id, ...props }, ref) => {
+  const { t } = useI18n()
   const [passwordVisible, setPasswordVisible] = React.useState(false)
   const generatedId = React.useId()
   const isPassword = type === "password"
   const inputId = id ?? (isPassword ? generatedId : undefined)
-  const toggleLabel = passwordVisible ? "Nascondi password" : "Mostra password"
+  const toggleLabel = t(passwordVisible ? "Nascondi password" : "Mostra password")
 
   const input = (
     <input
       id={inputId}
       type={isPassword && passwordVisible ? "text" : type}
       className={cn(
-        "flex h-9 w-full min-w-0 max-w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+        "flex h-9 w-full min-w-0 max-w-full rounded-[10px] border border-input bg-transparent px-3 py-1 text-base shadow-none transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
         className,
         isPassword && "min-h-11 pr-12 [&::-ms-reveal]:hidden"
       )}

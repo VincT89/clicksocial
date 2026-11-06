@@ -6,6 +6,8 @@ import { join, resolve, sep, extname } from 'node:path';
 import { loadConfig } from './config.mjs';
 import { openStore, fail, now, uid, safeUser, postRecord, digest, hashPassword, checkPassword, transaction } from './store.mjs';
 import { saveImage, ownedImage, ownedFile, saveFont } from './files.mjs';
+import { listMedia } from './media-library.mjs';
+import { MAX_IMAGE_BYTES } from '../shared/media.mjs';
 import { validateBrand, validateDesign, validatePlanning } from './design.mjs';
 import { getTemplate, defaultDesign } from '../shared/templates.mjs';
 import { createIntegrations } from './integrations.mjs';
@@ -337,9 +339,14 @@ export async function createApp(options = {}) {
       const user = await requiredUser(req); rateLimit(req, 'upload', 100, user);
       return saveFont(db, config, user, await bodyBuffer(req, 5 * 1024 * 1024), req.headers['x-file-name'] ? decodeURIComponent(req.headers['x-file-name']) : 'carattere');
     }
-    if (path === '/api/files' && method === 'POST') {
+    if (path === '/api/media' && method === 'GET') {
+      res.setHeader('Cache-Control', 'private, no-store');
+      return listMedia(db, config, await requiredUser(req), url.searchParams);
+    }
+    if ((path === '/api/files' || path === '/api/media') && method === 'POST') {
       const user = (await requiredUser(req)); rateLimit(req,'upload',100,user);
-      return (await saveImage(db,config,user,await bodyBuffer(req,15*1024*1024), req.headers['x-file-name'] ? decodeURIComponent(req.headers['x-file-name']) : 'immagine'));
+      const name = req.headers['x-file-name'] ? decodeURIComponent(req.headers['x-file-name']) : 'immagine';
+      return saveImage(db, config, user, await bodyBuffer(req, MAX_IMAGE_BYTES), name, { media:path === '/api/media' });
     }
     if (/^\/api\/files\/[a-f0-9-]{36}$/.test(path) && method === 'GET') {
       const image = (await ownedFile(db,config,(await requiredUser(req)),path));

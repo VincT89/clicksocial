@@ -2,7 +2,7 @@ const money = value => Math.round(value * 1e12) / 1e12;
 const amount = value => Number.isFinite(value) && value >= 0;
 const tokens = value => Number.isSafeInteger(value) && value >= 0;
 
-// Somma solo le voci misurate, senza trasformare un costo mancante in zero.
+/** Somma solo le voci misurate, senza trasformare un costo mancante in zero. */
 export function sumAiCosts(costs) {
   const known = costs.filter(cost => amount(cost?.min_usd) && amount(cost?.max_usd) && cost.max_usd >= cost.min_usd);
   const incomplete = costs.filter(cost => cost?.status !== 'complete' || !known.includes(cost)).length;
@@ -15,10 +15,10 @@ export function sumAiCosts(costs) {
   };
 }
 
-export function formatAiCost(cost) {
+export function formatAiCost(cost, locale = 'it-IT') {
   if (!amount(cost?.min_usd) || !amount(cost?.max_usd)) return 'Non disponibile';
-  const format = value => new Intl.NumberFormat('it-IT', { minimumFractionDigits: 4, maximumFractionDigits: 6 }).format(value);
-  if (cost.min_usd === cost.max_usd) return cost.max_usd > 0 && cost.max_usd < 0.000001 ? '< $0,000001' : '$' + format(cost.max_usd);
+  const format = value => new Intl.NumberFormat(locale, { minimumFractionDigits: 4, maximumFractionDigits: 6 }).format(value);
+  if (cost.min_usd === cost.max_usd) return cost.max_usd > 0 && cost.max_usd < 0.000001 ? '< $' + format(0.000001) : '$' + format(cost.max_usd);
   return '$' + format(cost.min_usd) + '–' + format(cost.max_usd);
 }
 

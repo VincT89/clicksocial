@@ -1,3 +1,5 @@
+import AppSelect from '@/components/AppSelect';
+import { useI18n, translate as translateUI, languageLocale } from '@/lib/i18n';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '@/api/client';
 import PhotoUploader from '@/components/studio/PhotoUploader';
@@ -7,6 +9,7 @@ import { useStudioState } from '@/lib/StudioStateContext';
 import CopyPanel from '@/components/studio/CopyPanel';
 import PostCaption from '@/components/studio/PostCaption';
 import WorkspaceHeader from '@/components/WorkspaceHeader';
+import HelpButton from '@/components/HelpButton';
 import ConfirmAction from '@/components/ConfirmAction';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +33,7 @@ import BrandSettings from '@/components/brand/BrandSettings';
 import '@/components/studio/Studio.css';
 
 export default function Studio() {
+  useI18n();
   const { user, appPublicSettings } = useAuth();
   const settings = appPublicSettings?.public_settings || {};
   const navigate = useNavigate();
@@ -65,7 +69,7 @@ export default function Studio() {
   const locked = ['in_coda','in_pubblicazione','pubblicato','da_verificare'].includes(postStatus);
   useEffect(() => {
     alive.current = true;
-    api.auth.me().then(account => { if (alive.current) setMe(account); }).catch(e => toast.error(e.message));
+    api.auth.me().then(account => { if (alive.current) setMe(account); }).catch(e => toast.error(translateUI(e.message)));
     return () => { alive.current = false; };
   }, []);
   const loadPost = async postId => {
@@ -137,15 +141,15 @@ export default function Studio() {
         try {
           await checkGeneratedTemplate(graphicUrl || originalUrl, result.data.design, graphicUrl ? DEFAULT_FILTERS : filters, result.data.headline, result.data.graphic_subtitle);
         } catch (error) {
-          if (draftRevision.current === revision) toast.error('Contenuto generato. Prima di salvare: ' + error.message);
+          if (draftRevision.current === revision) toast.error(translateUI("Contenuto generato. Prima di salvare: ") + translateUI(error.message));
           return;
         }
       }
-      if (draftRevision.current === revision) toast.success('Post pronto. Controlla immagine e descrizione.');
+      if (draftRevision.current === revision) toast.success(translateUI("Post pronto. Controlla immagine e descrizione."));
     } catch (e) {
       if (draftRevision.current === revision) {
         if (e.status === 402 && alive.current) setMe(account => ({ ...account, ai_generations_used:2 }));
-        toast.error('Generazione non riuscita: ' + e.message);
+        toast.error(translateUI("Generazione non riuscita: ") + translateUI(e.message));
       }
     } finally { generateLock.current = false; if (draftRevision.current === revision) setGenerating(false); }
   };
@@ -164,16 +168,16 @@ export default function Studio() {
       if (draftRevision.current === revision) { setEditingId(saved.id); setPostStatus(saved.status || 'bozza'); }
       if (alive.current && draftRevision.current === revision) {
         if (intent === 'publish') { setDrawerOpen(false); setPublishPost(saved); setParams({ id: saved.id }, { replace: true }); }
-        else { toast.success('Salvato nelle bozze'); resetDraft(); navigate('/library?view=drafts'); }
+        else { toast.success(translateUI("Salvato nelle bozze")); resetDraft(); navigate('/library?view=drafts'); }
       }
-    } catch (e) { toast.error('Salvataggio non riuscito: ' + e.message); }
+    } catch (e) { toast.error(translateUI("Salvataggio non riuscito: ") + translateUI(e.message)); }
     finally { saveLock.current = false; if (alive.current) setSaving(false); }
   };
   const uploaded = async url => {
     if (planning && editingId) {
       setOriginalUrl(url);
-      try { await api.entities.Post.update(editingId, { original_image_url: url }); toast.success('Foto collegata alla bozza'); }
-      catch (e) { toast.error('Non riesco a conservare la foto nella bozza: ' + e.message); }
+      try { await api.entities.Post.update(editingId, { original_image_url: url }); toast.success(translateUI("Foto collegata alla bozza")); }
+      catch (e) { toast.error(translateUI("Non riesco a conservare la foto nella bozza: ") + translateUI(e.message)); }
       return;
     }
     const selectedDesign = design || newPostDesign(me);
@@ -181,17 +185,17 @@ export default function Studio() {
     setParams({}, { replace:true });
   };
   const refreshBrand = async () => {
-    try { const account = await api.auth.me(); setMe(account); setDesign(current => ({ ...current, brand: brandFromProfile(account) })); toast.success('Identità aziendale aggiornata in questa anteprima'); }
-    catch (e) { toast.error(e.message); }
+    try { const account = await api.auth.me(); setMe(account); setDesign(current => ({ ...current, brand: brandFromProfile(account) })); toast.success(translateUI("Identità aziendale aggiornata in questa anteprima")); }
+    catch (e) { toast.error(translateUI(e.message)); }
   };
   const planningSummary = planning && <section data-tour="studio-planning" className="rounded-xl border border-border bg-card p-4 mb-6 space-y-2">
-    <h2 className="font-heading text-lg break-words">Dalla bozza: {planning.topic}</h2>
-    {editorialAt && <p className="text-sm text-muted-foreground">Pubblicazione prevista: {new Date(editorialAt).toLocaleString('it-IT', { dateStyle:'short', timeStyle:'short' })}</p>}
+    <h2 className="font-heading text-lg break-words">{translateUI("Dalla bozza:")} {planning.topic}</h2>
+    {editorialAt && <p className="text-sm text-muted-foreground">{translateUI("Pubblicazione prevista:")} {new Date(editorialAt).toLocaleString(languageLocale(), { dateStyle:'short', timeStyle:'short' })}</p>}
     {planning.objective && <p className="text-sm whitespace-pre-wrap break-words">{planning.objective}</p>}
-    <details className="text-sm"><summary className="cursor-pointer min-h-11 flex items-center">Brief e scatti da preparare</summary>
-      {[['Scatti',planning.shots],['Testo provvisorio',planning.provisional_copy],['Note',planning.notes]].filter(([,text]) => text).map(([label,text]) => <div key={label} className="mt-3"><p className="font-medium">{label}</p><p className="text-muted-foreground whitespace-pre-wrap break-words">{text}</p></div>)}
+    <details className="text-sm"><summary className="cursor-pointer min-h-11 flex items-center">{translateUI("Brief e scatti da preparare")}</summary>
+      {[['Scatti',planning.shots],['Testo provvisorio',planning.provisional_copy],['Note',planning.notes]].filter(([,text]) => text).map(([label,text]) => <div key={label} className="mt-3"><p className="font-medium">{translateUI(label)}</p><p className="text-muted-foreground whitespace-pre-wrap break-words">{text}</p></div>)}
     </details>
-    <p className="text-xs text-muted-foreground">Queste informazioni guidano la generazione. Il post mantiene la bozza e la data prevista.</p>
+    <p className="text-xs text-muted-foreground">{translateUI("Queste informazioni guidano la generazione. Il post mantiene la bozza e la data prevista.")}</p>
   </section>;
   const controlsDisabled = saving || generating || loading || locked || assetBusy || !!publishPost || !!loadError;
   const activeDesign = design || newPostDesign(me);
@@ -204,88 +208,95 @@ export default function Studio() {
   const selectElement = role => { setSelectedElement(role); if (role) setDrawerTab('graphic'); };
   const requestField = (
     <div className="studio-brief">
-      <label htmlFor="post-context" className="text-sm font-medium">
-        Cosa vuoi comunicare? <span className="text-xs font-normal text-muted-foreground">(facoltativo)</span>
+      <label htmlFor="post-context" className="text-sm font-medium">{translateUI("Cosa vuoi comunicare?")} <span className="text-xs font-normal text-muted-foreground">{translateUI("(facoltativo)")}</span>
       </label>
       <textarea id="post-context" value={context} onChange={event => setContext(event.target.value)}
-        maxLength={2000} rows={2} readOnly={locked} disabled={controlsDisabled && !locked} placeholder="Es. oggi caffè a 1 euro" />
+        maxLength={2000} rows={2} readOnly={locked} disabled={controlsDisabled && !locked} placeholder={translateUI("Es. oggi caffè a 1 euro")} />
     </div>
   );
   const generateButton = (
     <Button data-tour="studio-generate" onClick={generate} disabled={controlsDisabled || !aiAvailable || !canGenerate}
       variant={hasContent ? 'ghost' : 'default'}>
-      {generating ? 'Generazione in corso…' : hasContent ? 'Rigenera' : 'Genera'}
+      {generating ? translateUI("Generazione in corso…") : hasContent ? translateUI("Rigenera") : translateUI("Genera")}
     </Button>
   );
   const saveButtons = !locked && (
     <div className="studio-save-actions">
-      {hasContent && <Button data-tour="studio-publish" onClick={() => save('publish')} disabled={controlsDisabled}>Pubblica</Button>}
+      {hasContent && <Button data-tour="studio-publish" onClick={() => save('publish')} disabled={controlsDisabled || String(platform).toLowerCase() === 'tiktok'}>{translateUI("Pubblica")}</Button>}
       <Button data-tour="studio-save" onClick={() => save('draft')} variant="outline" disabled={controlsDisabled} aria-busy={saving}>
-        {saving ? 'Salvataggio…' : 'Salva in bozze'}
+        {saving ? translateUI("Salvataggio…") : translateUI("Salva in bozze")}
       </Button>
     </div>
   );
   let generationNote;
   if (!aiAvailable) {
-    generationNote = 'La generazione non è disponibile al momento. Puoi salvare la foto in bozza.';
+    generationNote = translateUI('La generazione non è disponibile al momento. Puoi salvare la foto in bozza.');
   } else if (!canGenerate) {
-    generationNote = <>Hai utilizzato le generazioni gratuite. <Link className="underline" to="/profilo?section=plan">Apri il piano</Link></>;
+    generationNote = <>{translateUI("Hai utilizzato le generazioni gratuite.")} <Link className="underline" to="/profilo?section=plan">{translateUI("Apri il piano")}</Link></>;
   } else if (!hasContent) {
-    generationNote = 'Prepariamo grafica, descrizione e hashtag per ' + PLATFORMS[String(platform).toLowerCase()] + '.';
+    generationNote = translateUI('Prepariamo grafica, descrizione e hashtag per {platform}.', {platform:PLATFORMS[String(platform).toLowerCase()] || translateUI('il social')});
   }
   const drawer = <StudioDrawer open={drawerOpen} onOpenChange={open => { if (!assetBusy) setDrawerOpen(open); }} tab={drawerTab} onTabChange={setDrawerTab} busy={assetBusy}>
     <fieldset disabled={controlsDisabled} className="space-y-5 min-w-0">
       {drawerTab === 'graphic' && <>
-        {originalUrl && graphicWarning && <details className="studio-settings-section"><summary>Avvisi grafica</summary><p role="status" className="pt-2 text-sm text-muted-foreground">{graphicWarning}</p></details>}
-        {originalUrl && !design ? <div data-tour="studio-legacy" className="space-y-3"><p className="text-sm">Questo post usa la composizione precedente. Applica un template alla foto originale per modificare separatamente logo e scritte.</p><Button variant="outline" onClick={convertLegacy}>Applica un template alla foto originale</Button></div> : <>
+        {originalUrl && graphicWarning && <details className="studio-settings-section"><summary>{translateUI("Avvisi grafica")}</summary><p role="status" className="pt-2 text-sm text-muted-foreground">{graphicWarning}</p></details>}
+        {originalUrl && !design ? <div data-tour="studio-legacy" className="space-y-3"><p className="text-sm">{translateUI("Questo post usa la composizione precedente. Applica un template alla foto originale per modificare separatamente logo e scritte.")}</p><Button variant="outline" onClick={convertLegacy}>{translateUI("Applica un template alla foto originale")}</Button></div> : <>
           <ElementSettings design={activeDesign} onChange={changeDesign} selected={selectedElement} onSelect={selectElement} layout={elementLayout} onBusyChange={setAssetBusy} copy={copy} onCopyChange={setCopy} />
-          <details className="studio-settings-section"><summary>Formato e schemi iniziali</summary><div className="pt-4"><TemplateSelector value={activeDesign} onChange={changeDesign} disabled={controlsDisabled || assetBusy} integrated={mode === 'graphic'} /></div></details>
-          <details className="studio-settings-section"><summary>Loghi e colori del post</summary><div className="pt-4 space-y-4">
-            <div><label htmlFor="studio-logo" className="text-sm font-medium block mb-2">Variante del logo</label><select id="studio-logo" className="w-full min-h-11 rounded-md border border-input bg-background px-3 text-sm" value={activeDesign.logo_variant} onChange={event => changeDesign(current => ({ ...current, logo_variant: event.target.value }))}><option value="auto">Automatica in base al contrasto</option>{Object.entries(LOGO_VARIANTS).map(([key,label]) => <option key={key} value={key} disabled={!activeDesign.brand.logos[key].url}>{label}</option>)}</select></div>
+          <details className="studio-settings-section"><summary>{translateUI("Formato e schemi iniziali")}</summary><div className="pt-4"><TemplateSelector value={activeDesign} onChange={changeDesign} disabled={controlsDisabled || assetBusy} integrated={mode === 'graphic'} /></div></details>
+          <details className="studio-settings-section"><summary>{translateUI("Loghi e colori del post")}</summary><div className="pt-4 space-y-4">
+            <div><label htmlFor="studio-logo" className="text-sm font-medium block mb-2">{translateUI("Variante del logo")}</label><AppSelect id="studio-logo" className="w-full min-h-11 rounded-md border border-input bg-background px-3 text-sm" value={activeDesign.logo_variant} onChange={event => changeDesign(current => ({ ...current, logo_variant: event.target.value }))}><option value="auto">{translateUI("Automatica in base al contrasto")}</option>{Object.entries(LOGO_VARIANTS).map(([key,label]) => <option key={key} value={key} disabled={!activeDesign.brand.logos[key].url}>{translateUI(label)}</option>)}</AppSelect></div>
             <BrandSettings value={activeDesign.brand} onChange={brand => changeDesign(current => ({ ...current, brand }))} onBusyChange={setAssetBusy} showFonts={false} />
-            <button type="button" data-tour="studio-brand-refresh" disabled={assetBusy} className="min-h-11 text-sm underline" onClick={refreshBrand}>Usa le impostazioni aziendali aggiornate</button>
+            <button type="button" data-tour="studio-brand-refresh" disabled={assetBusy} className="min-h-11 text-sm underline" onClick={refreshBrand}>{translateUI("Usa le impostazioni aziendali aggiornate")}</button>
           </div></details>
         </>}
       </>}
       {drawerTab === 'photo' && <>
-        {design?.text_mode === 'image' ? <p className="text-sm text-muted-foreground">La grafica mantiene l’inquadratura completa per preservare le scritte. Per cambiarla, aggiorna le indicazioni e rigenera dalla foto originale.</p> : design && <fieldset className="space-y-3"><legend className="text-sm font-medium mb-2">Inquadratura della foto</legend>{[['x','Ritaglio orizzontale'],['y','Ritaglio verticale']].map(([key,label]) => <div key={key}><label htmlFor={'crop-'+key} className="text-sm">{label}</label><input id={'crop-'+key} type="range" min="0" max="1" step="0.01" value={design.crop[key]} onChange={event => changeDesign(current => ({ ...current, crop: { ...current.crop, [key]: Number(event.target.value) } }))} className="w-full h-11" /></div>)}</fieldset>}
+        {design?.text_mode === 'image' ? <p className="text-sm text-muted-foreground">{translateUI("La grafica mantiene l’inquadratura completa per preservare le scritte. Per cambiarla, aggiorna le indicazioni e rigenera dalla foto originale.")}</p> : design && <fieldset className="space-y-3"><legend className="text-sm font-medium mb-2">{translateUI("Inquadratura della foto")}</legend>{[['x','Ritaglio orizzontale'],['y','Ritaglio verticale']].map(([key,label]) => <div key={key}><label htmlFor={'crop-'+key} className="text-sm">{translateUI(label)}</label><input id={'crop-'+key} type="range" min="0" max="1" step="0.01" value={design.crop[key]} onChange={event => changeDesign(current => ({ ...current, crop: { ...current.crop, [key]: Number(event.target.value) } }))} className="w-full h-11" /></div>)}</fieldset>}
         <PhotoAdjustments filters={filters} activePreset={activePreset} onFiltersChange={setFilters} onPresetChange={setActivePreset} disabled={controlsDisabled || !originalUrl} />
       </>}
       {drawerTab === 'copy' && <div data-tour="studio-copy"><CopyPanel platform={platform} setPlatform={setPlatform} tone={tone} setTone={setTone} mode={mode} setMode={setMode} generating={generating} copy={copy} setCopy={setCopy} imageText={activeDesign.text_mode === 'image'} templateMode={!!design || !originalUrl} autoTextStyle={activeDesign.ai_text_style === true} onAutoTextStyleChange={enabled => changeDesign(current => ({ ...current, ai_text_style: enabled }))} /></div>}
       {drawerTab === 'post' && <>
-        <div data-tour="studio-title" className="space-y-2"><label htmlFor="post-title" className="text-sm font-medium">Titolo del post salvato</label><Input id="post-title" value={title} onChange={event => setTitle(event.target.value)} maxLength={200} placeholder="Nome interno del contenuto" /></div>
-        <p className="text-sm text-muted-foreground">Salva in bozze conserva il post per dopo. Pubblica apre la conferma dell’account di destinazione.</p>
+        <div data-tour="studio-title" className="space-y-2"><label htmlFor="post-title" className="text-sm font-medium">{translateUI("Titolo del post salvato")}</label><Input id="post-title" value={title} onChange={event => setTitle(event.target.value)} maxLength={200} placeholder={translateUI("Nome interno del contenuto")} /></div>
+        <p className="text-sm text-muted-foreground">{translateUI("Salva in bozze conserva il post per dopo. Pubblica apre la conferma dell’account di destinazione.")}</p>
         {planningSummary}
-        <p className="text-sm text-muted-foreground">{isNative ? 'La bozza viene conservata su questo dispositivo. Salvala per ritrovarla anche in I miei post.' : 'La bozza resta disponibile quando cambi sezione. Salva prima di ricaricare o chiudere la pagina.'}</p>
-        {!isPro && <p className="text-sm text-muted-foreground">Generazioni AI disponibili: {remaining}. <Link className="underline" to="/profilo?section=plan">Apri il piano</Link></p>}
+        <p className="text-sm text-muted-foreground">{isNative ? translateUI("La bozza viene conservata su questo dispositivo. Salvala per ritrovarla anche in I miei post.") : translateUI("La bozza resta disponibile quando cambi sezione. Salva prima di ricaricare o chiudere la pagina.")}</p>
+        {!isPro && <p className="text-sm text-muted-foreground">{translateUI("Generazioni AI disponibili:")} {remaining}. <Link className="underline" to="/profilo?section=plan">{translateUI("Apri il piano")}</Link></p>}
       </>}
     </fieldset>
   </StudioDrawer>;
-  return <div className="studio-shell bg-background">
-    <WorkspaceHeader subtitle="Studio" />
-    <main className="studio-main">
-      {loading ? <p role="status">Caricamento del post…</p> : loadError ? <div role="alert" className="space-y-3"><p>{loadError}</p><Button onClick={() => loadPost(id)}>Riprova</Button><Button variant="outline" asChild><Link to="/library">Vai ai miei post</Link></Button></div> : <>
+  const landscapeGuide = <span className="studio-landscape-guide"><HelpButton /></span>;
+  return <div className={"studio-shell bg-background" + (hasContent ? " is-generated" : "")}>
+    <WorkspaceHeader subtitle={translateUI("Crea post")} />
+    <main className={originalUrl && !loading && !loadError ? 'studio-main studio-main-with-photo' : 'studio-main'}>
+      {loading ? <p role="status">{translateUI("Caricamento del post…")}</p> : loadError ? <div role="alert" className="space-y-3"><p>{loadError}</p><Button onClick={() => loadPost(id)}>{translateUI("Riprova")}</Button><Button variant="outline" asChild><Link to="/library">{translateUI("Vai ai miei post")}</Link></Button></div> : <>
         <div className="studio-toolbar">
-          <h1 className="font-heading text-lg truncate">{title || (editingId ? 'Il tuo post' : 'Crea il tuo post')}</h1>
+          <h1 className="font-heading text-lg truncate">{title || (editingId ? translateUI("Il tuo post") : translateUI("Crea il tuo post"))}</h1>
+          {!originalUrl && landscapeGuide}
           {originalUrl && <Button variant="ghost" disabled={controlsDisabled} onClick={() => setReplacement({ id: null })}>
-            <Plus size={18} aria-hidden="true" /> Nuovo post
-          </Button>}
+            <Plus size={18} aria-hidden="true" />{translateUI("Nuovo post")}</Button>}
         </div>
-        {locked && <p className="text-xs text-muted-foreground">{postStatus === 'pubblicato' ? 'Post pubblicato: sola lettura.' : 'Annulla l’invio automatico da I miei post per modificarlo.'} <Link to="/library" className="underline">Vai ai miei post</Link></p>}
+        {locked && <p className="studio-status text-xs text-muted-foreground">{postStatus === 'pubblicato' ? translateUI("Post pubblicato: sola lettura.") : translateUI("Annulla l’invio automatico da I miei post per modificarlo.")} <Link to="/library" className="underline">{translateUI("Vai ai miei post")}</Link></p>}
         <div className="studio-content">
-          {!originalUrl ? <div className="studio-empty"><PhotoUploader onUploaded={uploaded} /></div> : <PhotoEditor ref={editorRef} disabled={controlsDisabled} imageUrl={copy?.graphic_url || originalUrl} headline={design || !copy?.graphic_url ? copy?.headline || null : null} subtitle={copy?.graphic_subtitle || ''} design={design} filters={filters} onDesignChange={changeDesign} selectedElement={selectedElement} onSelectElement={selectElement} elementLayout={elementLayout} onLayoutChange={setElementLayout} onWarningChange={setGraphicWarning} />}
-          {originalUrl && <section className="studio-result" aria-label="Il tuo post">
+          {!originalUrl ? <div className="studio-empty"><PhotoUploader onUploaded={uploaded} /></div> : <section className="studio-preview-panel" aria-labelledby="studio-preview-title">
+            <PhotoEditor ref={editorRef} disabled={controlsDisabled} imageUrl={copy?.graphic_url || originalUrl}
+              headline={design || !copy?.graphic_url ? copy?.headline || null : null} subtitle={copy?.graphic_subtitle || ''}
+              design={design} filters={filters} onDesignChange={changeDesign} selectedElement={selectedElement} onSelectElement={selectElement}
+              elementLayout={elementLayout} onLayoutChange={setElementLayout} onWarningChange={setGraphicWarning} />
+            <div className="studio-preview-tools"><h2 id="studio-preview-title">{translateUI("Anteprima")}</h2>{landscapeGuide}{drawer}</div>
+          </section>}
+          {originalUrl && <section className="studio-result" aria-label={translateUI("Il tuo post")}>
             {hasContent ? <>
               <PostCaption platform={PLATFORMS[String(platform).toLowerCase()]}
                 value={[copy?.caption, copy?.hashtags].filter(Boolean).join('\n\n')}
                 onChange={caption => setCopy({ ...copy, caption, hashtags: '' })}
                 readOnly={locked} disabled={controlsDisabled && !locked} />
+              {!locked && <div className="studio-destination"><label htmlFor="studio-destination">{translateUI("Pubblica su")}</label><AppSelect id="studio-destination" value={String(platform).toLowerCase()} onChange={event => setPlatform(event.target.value)} disabled={controlsDisabled}><option value="instagram">{translateUI("Instagram")}</option><option value="facebook">{translateUI("Facebook")}</option>{String(platform).toLowerCase() === 'tiktok' && <option value="tiktok" disabled>{translateUI("Canale non disponibile")}</option>}</AppSelect></div>}
               {saveButtons}
               {(!locked || context) && <div className="studio-revision">
                 <details ref={requestDetails} data-tour="studio-context">
-                  <summary aria-label={locked ? 'Leggi la richiesta' : 'Modifica richiesta'}>
-                    <span className="studio-request-text">{context.trim() || 'Dalla foto'}</span>
-                    <span className="studio-request-toggle">{locked ? 'Leggi' : 'Modifica richiesta'}</span>
+                  <summary aria-label={locked ? translateUI("Leggi la richiesta") : translateUI("Modifica richiesta")}>
+                    <span className="studio-request-text">{context.trim() || translateUI("Dalla foto")}</span>
+                    <span className="studio-request-toggle">{locked ? translateUI("Leggi") : translateUI("Modifica richiesta")}</span>
                   </summary>
                   {requestField}
                 </details>
@@ -296,16 +307,16 @@ export default function Studio() {
               <div data-tour="studio-context">{requestField}</div>
               {!locked && <div className="studio-actions">
                 {generateButton}
-                {generationNote && <p className="studio-action-note" role="status">{generationNote}</p>}
                 {saveButtons}
+                {generationNote && <p className="studio-action-note" role="status">{generationNote}</p>}
               </div>}
             </>}
           </section>}
         </div>
       </>}
-      <div className="studio-footer">{drawer}</div>
+      {!originalUrl && <div className="studio-footer">{drawer}</div>}
     </main>
-    <ConfirmAction open={!!replacement} onOpenChange={open => { if (!open) keepDraft(); }} title="Sostituire la bozza aperta?" description="Le modifiche non salvate della bozza corrente verranno perse." confirmLabel="Sostituisci bozza" onConfirm={replaceDraft} busy={saving || generating || assetBusy} destructive />
+    <ConfirmAction open={!!replacement} onOpenChange={open => { if (!open) keepDraft(); }} title={translateUI("Sostituire la bozza aperta?")} description={translateUI("Le modifiche non salvate della bozza corrente verranno perse.")} confirmLabel={translateUI("Sostituisci bozza")} onConfirm={replaceDraft} busy={saving || generating || assetBusy} destructive />
     {publishPost && <ScheduleDialog post={publishPost} open onOpenChange={open => { if (!open) setPublishPost(null); }} onScheduled={async () => { setPublishPost(null); resetDraft(); navigate('/library'); }} />}
   </div>;
 }

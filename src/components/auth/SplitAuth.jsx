@@ -1,3 +1,4 @@
+import { useI18n, translate as translateUI } from '@/lib/i18n';
 import React, { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
@@ -19,6 +20,7 @@ const THEMES = {
 };
 
 export default function SplitAuth({ theme = "purple", label, title, text, children, footer = null }) {
+  useI18n();
   const panelRef = useRef(null);
   useEffect(() => {
     if (!isNativeIOS) return;
@@ -44,28 +46,28 @@ export default function SplitAuth({ theme = "purple", label, title, text, childr
     };
   }, []);
   return (
-    <div className="auth-screen bg-background grid lg:grid-cols-2">
+    <main className="auth-screen bg-background grid lg:grid-cols-2">
       <section
-        aria-label="ClickSocial"
+        aria-label={translateUI("ClickSocial")}
         className={`relative hidden lg:flex flex-col justify-between overflow-hidden p-10 ${THEMES[theme].panel}`}
       >
         <div aria-hidden="true" className="pointer-events-none absolute -top-32 -left-32 w-96 h-96 rounded-full bg-white/10 blur-2xl" />
-        <Link to="/" aria-label="ClickSocial, home" className="relative inline-flex items-center gap-2 font-heading text-lg font-bold tracking-tight">
+        <Link to="/" aria-label={translateUI("ClickSocial, home")} className="relative inline-flex items-center gap-2 font-heading text-lg font-bold tracking-tight">
           <Logo />
           <span>
-            <span className="text-white/70 font-medium">Click</span>
-            <strong className="text-white">Social</strong>
+            <span className="text-white/70 font-medium">{translateUI("Click")}</span>
+            <strong className="text-white">{translateUI("Social")}</strong>
           </span>
         </Link>
         <div className="relative max-w-md">
-          <p className="text-xs font-semibold uppercase tracking-widest text-white/70">{label}</p>
-          <h1 className="font-heading text-4xl font-bold text-white leading-tight mt-3">{title}</h1>
+          <p className="text-xs font-semibold uppercase tracking-widest text-white/70">{translateUI(label)}</p>
+          <h2 className="font-heading text-4xl font-bold text-white leading-tight mt-3">{title}</h2>
           <p className="text-white/70 mt-4 leading-relaxed">{text}</p>
         </div>
         <div className="relative mx-auto w-[260px] sm:w-[296px]">
           <PhoneMockup
             image={AUTH_FEED_IMG}
-            caption="“Il tuo brand, ogni mattina.”"
+            caption={translateUI("Il tuo brand, ogni mattina.")}
           />
         </div>
       </section>
@@ -76,18 +78,17 @@ export default function SplitAuth({ theme = "purple", label, title, text, childr
             to="/"
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-8"
           >
-            <ArrowLeft className="w-4 h-4" /> Torna alla home
-          </Link>
+            <ArrowLeft className="w-4 h-4" />{translateUI("Torna alla home")}</Link>
           <div className="mb-8 lg:hidden">
             <span className="font-heading text-lg font-bold tracking-tight">
-              <span className="font-medium text-foreground/70">Click</span>
-              <strong className="text-foreground">Social</strong>
+              <span className="font-medium text-foreground/70">{translateUI("Click")}</span>
+              <strong className="text-foreground">{translateUI("Social")}</strong>
             </span>
           </div>
           {children}
           {footer && <div className="text-sm text-muted-foreground mt-8">{footer}</div>}
         </div>
       </section>
-    </div>
+    </main>
   );
 }

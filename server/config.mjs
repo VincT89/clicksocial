@@ -5,8 +5,9 @@ import { isPrivateAddress } from '../shared/mobile-config.mjs';
 
 export function loadConfig(overrides = {}) {
   const root = resolve(import.meta.dirname, '..');
-  if (existsSync(join(root, '.env'))) process.loadEnvFile(join(root, '.env'));
-  const env = process.env;
+  /** I collaudi isolati usano soltanto le impostazioni passate dal test, senza aprire la configurazione dell’installazione. */
+  const env = overrides.useProjectEnv === false ? {} : process.env;
+  if (overrides.useProjectEnv !== false && existsSync(join(root, '.env'))) process.loadEnvFile(join(root, '.env'));
   const dataDir = resolve(root, overrides.dataDir || env.DATA_DIR || 'data');
   const config = {
     root, dataDir, port: Number(env.PORT || 8787), host: '127.0.0.1',

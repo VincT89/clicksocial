@@ -1,9 +1,12 @@
+import { useI18n } from '@/lib/i18n';
+import { translate as translateUI } from '@/lib/i18n';
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/api/client";
 import { Plug, Loader2, Check, X } from "lucide-react";
 
 export default function AiStatusCard() {
+  useI18n();
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState(null);
 
@@ -23,18 +26,14 @@ export default function AiStatusCard() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <p className="text-sm text-muted-foreground">
-          Verifica che il motore AI (generazione dei copy) risponda correttamente.
-        </p>
+        <p className="text-sm text-muted-foreground">{translateUI("Verifica che il motore AI (generazione dei copy) risponda correttamente.")}{' '}</p>
         <Button onClick={runTest} disabled={testing} className="rounded-full shrink-0">
           {testing ? (
             <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Test in corso…
-            </>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />{' '}{translateUI("Test in corso…")}{' '}</>
           ) : (
             <>
-              <Plug className="w-4 h-4 mr-2" /> Testa connessione AI
-            </>
+              <Plug className="w-4 h-4 mr-2" />{' '}{translateUI("Testa connessione AI")}{' '}</>
           )}
         </Button>
       </div>
@@ -47,12 +46,12 @@ export default function AiStatusCard() {
         >
           {result.ok ? (
             <>
-              <Check className="w-4 h-4 text-purple shrink-0" /> Connessa · risposta in{" "}
+              <Check className="w-4 h-4 text-purple shrink-0" />{' '}{translateUI("Connessa · risposta in")}{" "}
               {result.latencyMs} ms
             </>
           ) : (
             <>
-              <X className="w-4 h-4 shrink-0" /> Errore: {result.error}
+              <X className="w-4 h-4 shrink-0" />{' '}{translateUI("Errore:")}{' '}{result.error}
             </>
           )}
         </div>

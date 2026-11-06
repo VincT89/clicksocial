@@ -1,3 +1,5 @@
+import { useI18n } from '@/lib/i18n';
+import { translate as translateUI } from '@/lib/i18n';
 import React from "react";
 import { Link } from "react-router-dom";
 import { Camera, Compass, Send, ShieldCheck } from "lucide-react";
@@ -25,82 +27,67 @@ const FLOW = [
 
 const STEPS = [
   { title: "Apri il tuo profilo", text: "Entra nella sezione dedicata ai collegamenti social." },
-  { title: "Scegli il social", text: "Apri Facebook, Instagram o TikTok tra i collegamenti disponibili." },
+  { title: "Scegli il social", text: "Scegli Facebook o Instagram tra i collegamenti disponibili." },
   { title: "Accedi e autorizza", text: "Accedi sul sito ufficiale del social e conferma l’account in ClickSocial." },
   { title: "Crea e pubblica", text: "Controlla foto, testo e destinazione prima di confermare l’invio." },
 ];
 
 export function FlowSection() {
+  useI18n();
   return (
     <section id="come-funziona" data-tour="flow" className="scroll-mt-20">
       <div className="text-center mb-10">
-        <span className="text-xs font-semibold uppercase tracking-widest text-purple">Un flusso semplice</span>
-        <h2 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight mt-2">
-          Dalla foto al feed, senza cambiare strumento.
-        </h2>
+        <span className="text-xs font-semibold uppercase tracking-widest text-purple">{translateUI("Un flusso semplice")}</span>
+        <h2 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight mt-2">{translateUI("Dalla foto al feed, senza cambiare strumento.")}{' '}</h2>
       </div>
       <div id="cosa-ottieni" className="grid md:grid-cols-3 gap-5 scroll-mt-20">
         {FLOW.map((f) => (
-          <article key={f.title} className="rounded-[20px] bg-card p-6 pwa-shadow">
+          <article key={translateUI(f.title)} className="rounded-[20px] bg-card p-6 pwa-shadow">
             <div className="flex items-center gap-3 mb-4">
               <span className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center">
                 <f.icon className="w-5 h-5 text-purple" />
               </span>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{f.tag}</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{translateUI(f.tag)}</span>
             </div>
-            <h3 className="font-heading text-lg font-bold">{f.title}</h3>
-            <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{f.text}</p>
+            <h3 className="font-heading text-lg font-bold">{translateUI(f.title)}</h3>
+            <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{translateUI(f.text)}</p>
           </article>
         ))}
       </div>
       <aside className="mt-5 rounded-[20px] bg-foreground text-background p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center gap-4">
         <div className="flex-1">
-          <strong className="font-heading text-lg">I tuoi profili restano sotto il tuo controllo.</strong>
-          <p className="text-sm text-background/70 mt-1">
-            Collegali in pochi clic oppure continua a pubblicare manualmente.
-          </p>
+          <strong className="font-heading text-lg">{translateUI("I tuoi profili restano sotto il tuo controllo.")}</strong>
+          <p className="text-sm text-background/70 mt-1">{translateUI("Collegali in pochi clic oppure continua a pubblicare manualmente.")}{' '}</p>
         </div>
         <Link
           to="/register"
           className="inline-flex justify-center rounded-full bg-background text-foreground text-sm font-semibold px-6 py-3 hover:bg-background/90 transition-colors"
-        >
-          Crea il tuo spazio
-        </Link>
+        >{translateUI("Crea il tuo spazio")}{' '}</Link>
       </aside>
     </section>
   );
 }
 
 export function ConnectionsSection() {
+  useI18n();
   return (
     <section id="collega-profili" data-tour="connections" className="rounded-[28px] bg-card p-6 sm:p-10 pwa-shadow scroll-mt-20">
       <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
         <div>
-          <span className="text-xs font-semibold uppercase tracking-widest text-purple">
-            Collegamento semplice e sicuro
-          </span>
-          <h2 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight mt-2 leading-tight">
-            I tuoi profili business, pronti quando vuoi pubblicare.
-          </h2>
+          <span className="text-xs font-semibold uppercase tracking-widest text-purple">{translateUI("Collegamento semplice e sicuro")}{' '}</span>
+          <h2 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight mt-2 leading-tight">{translateUI("I tuoi profili business, pronti quando vuoi pubblicare.")}{' '}</h2>
           <div className="mt-5 space-y-3 text-sm text-muted-foreground leading-relaxed">
-            <p>
-              Collega i social dal Profilo usando l’accesso sul sito ufficiale di ciascun servizio.
-              Scegli tu quale account autorizzare e confermalo prima di pubblicare.
-            </p>
-            <p className="text-foreground font-semibold">
-              In Profilo → Social trovi lo stato dei servizi attivati dal gestore.
-            </p>
+            <p>{translateUI("Collega i social dal Profilo usando l’accesso sul sito ufficiale di ciascun servizio. Scegli tu quale account autorizzare e confermalo prima di pubblicare.")}{' '}</p>
+            <p className="text-foreground font-semibold">{translateUI("In Profilo → Social trovi lo stato dei servizi attivati dal gestore.")}{' '}</p>
             <p className="flex items-start gap-2">
-              <ShieldCheck className="w-4 h-4 text-cyan mt-0.5 shrink-0" />
-              Le password dei social si inseriscono sui loro siti ufficiali, mai su ClickSocial.
-            </p>
+              <ShieldCheck className="w-4 h-4 text-cyan mt-0.5 shrink-0" />{translateUI("Le password dei social si inseriscono sui loro siti ufficiali, mai su ClickSocial.")}{' '}</p>
           </div>
           <div className="grid grid-cols-2 gap-3 mt-8">
             {STEPS.map((s, i) => (
-              <article key={s.title} className="rounded-[16px] bg-secondary p-4">
+              <article key={translateUI(s.title)} className="rounded-[16px] bg-secondary p-4">
                 <span className="text-[11px] font-bold text-purple">0{i + 1}</span>
-                <h3 className="font-semibold text-sm mt-1">{s.title}</h3>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{s.text}</p>
+                <h3 className="font-semibold text-sm mt-1">{translateUI(s.title)}</h3>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{translateUI(s.text)}</p>
               </article>
             ))}
           </div>
@@ -109,31 +96,20 @@ export function ConnectionsSection() {
           <article className="rounded-[20px] bg-facebook/5 border border-facebook/20 p-6">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-facebook">Meta</span>
-              <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-facebook/10 text-facebook">
-                Pagine
-              </span>
+              <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-facebook/10 text-facebook">{translateUI("Pagine")}{' '}</span>
             </div>
-            <h3 className="font-heading text-lg font-bold mt-2">Pagina Facebook</h3>
-            <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-              Scegli una Pagina che gestisci. Con Pro puoi pubblicare una foto subito o
-              programmarla, dopo l’attivazione del servizio da parte del gestore.
-            </p>
+            <h3 className="font-heading text-lg font-bold mt-2">{translateUI("Pagina Facebook")}</h3>
+            <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{translateUI("Scegli una Pagina che gestisci. Con Pro puoi pubblicare una foto subito o programmarla, dopo l’attivazione del servizio da parte del gestore.")}{' '}</p>
           </article>
-          <article className="rounded-[20px] bg-tiktok/5 border border-tiktok/20 p-6">
+          <article className="rounded-[20px] bg-primary/5 border border-primary/20 p-6">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Instagram e TikTok</span>
-              <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-foreground/10">
-                Foto
-              </span>
+              <span className="text-[11px] font-bold uppercase tracking-wider">Instagram</span>
+              <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-foreground/10">{translateUI("Foto")}{' '}</span>
             </div>
-            <h3 className="font-heading text-lg font-bold mt-2">I tuoi account</h3>
-            <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-              Instagram richiede un account professionale. Su TikTok le opzioni dipendono dai permessi concessi. Con Pro e il servizio attivo puoi inviare o programmare foto; resta disponibile il download per pubblicarle personalmente.
-            </p>
+            <h3 className="font-heading text-lg font-bold mt-2">{translateUI("I tuoi account")}</h3>
+            <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{translateUI("Instagram richiede un account professionale. Con Pro e il servizio attivo puoi inviare o programmare foto; resta disponibile il download per pubblicarle personalmente.")}{' '}</p>
           </article>
-          <p className="text-xs text-muted-foreground">
-            Puoi scollegare un profilo e revocare l'autorizzazione quando vuoi.
-          </p>
+          <p className="text-xs text-muted-foreground">{translateUI("Puoi scollegare un profilo e revocare l'autorizzazione quando vuoi.")}{' '}</p>
         </div>
       </div>
     </section>

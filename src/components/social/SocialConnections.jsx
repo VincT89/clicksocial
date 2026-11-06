@@ -1,3 +1,4 @@
+import { useI18n, translate as translateUI } from '@/lib/i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
@@ -7,10 +8,11 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import ConfirmAction from '@/components/ConfirmAction';
 
-const names = { facebook: 'Facebook', instagram: 'Instagram', tiktok: 'TikTok' };
+const names = { facebook: 'Facebook', instagram: 'Instagram' };
 const help = { facebook: 'Collega le Pagine che gestisci. I profili personali non sono supportati.', instagram: 'Autorizza il tuo profilo Business o Creator su Meta, poi scegli su quale profilo pubblicare.', tiktok: 'Autorizza il profilo e la pubblicazione delle foto. Le opzioni dipendono dai permessi del tuo account.' };
 const labels = { ready: 'Collegamento verificato', saved: 'Da verificare', reconnect: 'Da ricollegare', permissions: 'Permessi da aggiornare', unavailable: 'Verifica non disponibile', disconnected: 'Non collegato' };
 export default function SocialConnections({ active = true }) {
+  useI18n();
   const { user } = useAuth();
   const [params, setParams] = useSearchParams();
   const storageKey = 'clicksocial.social.' + apiOrigin + '.' + user?.id;
@@ -43,8 +45,8 @@ export default function SocialConnections({ active = true }) {
   }, [storageKey, setParams]);
   const finishFlow = useCallback(async (id, stage) => {
     if (!clearFlow(id)) return;
-    if (stage === 'completed') toast.success('Account social collegato');
-    else toast.info('Collegamento annullato. Gli account già collegati restano invariati.');
+    if (stage === 'completed') toast.success(translateUI("Account social collegato"));
+    else toast.info(translateUI("Collegamento annullato. Gli account già collegati restano invariati."));
     await load();
   }, [clearFlow, load]);
   const expireFlow = useCallback(async id => {
@@ -140,43 +142,43 @@ export default function SocialConnections({ active = true }) {
   };
   const disconnect = async () => {
     setBusy(true); setError('');
-    try { await api.social.disconnect(disconnecting); setDisconnecting(''); await load(); toast.success('Social scollegato'); }
+    try { await api.social.disconnect(disconnecting); setDisconnecting(''); await load(); toast.success(translateUI("Social scollegato")); }
     catch (e) { setError(e.message); }
     finally { setBusy(false); }
   };
   const visibleError = error || pollError || statusError;
   return <div className="space-y-4 min-w-0">
-    <p className="text-sm text-muted-foreground">Premi Collega, autorizza sul sito ufficiale e torna qui per confermare l’account. ClickSocial non ti chiede la password del social.</p>
-    {visibleError && <p role="alert" className="text-sm text-destructive break-words">{visibleError}</p>}
+    <p className="text-sm text-muted-foreground">{translateUI("Premi Collega, autorizza sul sito ufficiale e torna qui per confermare l’account. ClickSocial non ti chiede la password del social.")}</p>
+    {visibleError && <p role="alert" className="text-sm text-destructive break-words">{translateUI(visibleError)}</p>}
     {flowId && <div className="rounded-lg border border-border p-4 space-y-3" aria-live="polite">
-      <h3 className="font-medium">Collegamento {names[flow?.provider] || 'social'}</h3>
+      <h3 className="font-medium">{translateUI("Collegamento")} {names[flow?.provider] || translateUI("social")}</h3>
       {flow?.stage === 'choose' ? <>
-        <p className="text-sm">Seleziona gli account da usare in ClickSocial. Controlla che siano quelli della tua attività.</p>
+        <p className="text-sm">{translateUI("Seleziona gli account da usare in ClickSocial. Controlla che siano quelli della tua attività.")}</p>
         <div className="space-y-2">{flow.accounts.map(account => <label key={account.id} className="flex items-center gap-3 min-h-11 break-words"><input type="checkbox" className="h-5 w-5 shrink-0" checked={selected.includes(account.id)} onChange={e => setSelected(old => e.target.checked ? [...old, account.id] : old.filter(id => id !== account.id))} disabled={busy} /><span className="min-w-0 break-words">{account.name}</span></label>)}</div>
-        <Button className="min-h-11 w-full sm:w-auto" disabled={busy || !selected.length} onClick={confirm}>{busy ? 'Conferma…' : 'Conferma account selezionati'}</Button>
-      </> : <p className="text-sm">{flow?.stage === 'error' ? flow.message : 'Completa l’autorizzazione nella finestra del social, poi torna qui. Il collegamento scade dopo 15 minuti.'}</p>}
-      {launchError && <p role="alert" className="text-sm text-destructive break-words">{launchError}</p>}
-      {reopen && (isNative ? <Button variant="outline" className="min-h-11" onClick={() => openExternal(reopen).catch(() => setLaunchError('Non riesco ad aprire il social. Riprova oppure annulla il collegamento.'))}>Apri autorizzazione</Button> : <a href={reopen} target="_blank" rel="noopener noreferrer" className="block min-h-11 py-3 text-purple underline">Apri autorizzazione</a>)}
-      <Button variant="outline" className="min-h-11 w-full sm:w-auto sm:ml-2" disabled={busy} onClick={cancel}>{flow?.stage === 'error' ? 'Chiudi e riprova' : 'Annulla collegamento'}</Button>
+        <Button className="min-h-11 w-full sm:w-auto" disabled={busy || !selected.length} onClick={confirm}>{busy ? translateUI("Conferma…") : translateUI("Conferma account selezionati")}</Button>
+      </> : <p className="text-sm">{flow?.stage === 'error' ? translateUI(flow.message) : translateUI("Completa l’autorizzazione nella finestra del social, poi torna qui. Il collegamento scade dopo 15 minuti.")}</p>}
+      {launchError && <p role="alert" className="text-sm text-destructive break-words">{translateUI(launchError)}</p>}
+      {reopen && (isNative ? <Button variant="outline" className="min-h-11" onClick={() => openExternal(reopen).catch(() => setLaunchError('Non riesco ad aprire il social. Riprova oppure annulla il collegamento.'))}>{translateUI("Apri autorizzazione")}</Button> : <a href={reopen} target="_blank" rel="noopener noreferrer" className="block min-h-11 py-3 text-purple underline">{translateUI("Apri autorizzazione")}</a>)}
+      <Button variant="outline" className="min-h-11 w-full sm:w-auto sm:ml-2" disabled={busy} onClick={cancel}>{flow?.stage === 'error' ? translateUI("Chiudi e riprova") : translateUI("Annulla collegamento")}</Button>
     </div>}
-    {!status && !statusError && <p role="status" className="text-sm">Verifica dei collegamenti…</p>}
+    {!status && !statusError && <p role="status" className="text-sm">{translateUI("Verifica dei collegamenti…")}</p>}
     {Object.entries(names).map(([provider, name]) => {
       const item = status?.[provider];
       if (!item) return null;
       return <div key={provider} className="rounded-xl border border-border p-4 space-y-3 min-w-0">
         <h3 className="font-medium">{name}</h3>
-        <p className="text-sm">{item.configured ? labels[item.state] : 'Attivazione a cura del gestore'}</p>
+        <p className="text-sm">{item.configured ? translateUI(labels[item.state]) : translateUI("Attivazione a cura del gestore")}</p>
         {!!item.accounts.length && <p className="text-sm break-words">{item.accounts.map(account => account.name).join(', ')}</p>}
-        <p className="text-sm text-muted-foreground break-words">{item.message || help[provider]}</p>
-        {!item.configured && <p className="text-sm text-muted-foreground">Il gestore deve configurare l’app della società per {name}. Non devi creare un’app sviluppatore o inserire chiavi.</p>}
+        <p className="text-sm text-muted-foreground break-words">{translateUI(item.message || help[provider])}</p>
+        {!item.configured && <p className="text-sm text-muted-foreground">{translateUI("Il gestore deve configurare l’app della società per")} {name}{translateUI(". Non devi creare un’app sviluppatore o inserire chiavi.")}</p>}
         <div className="flex flex-wrap gap-2">
-          <Button data-tour={provider === 'facebook' ? 'social-connect' : undefined} className="min-h-11 whitespace-normal" disabled={busy || !!flowId || !item.configured} onClick={() => connect(provider)}>{item.connected ? 'Ricollega ' + name : 'Collega ' + name}</Button>
-          {item.connected && <Button variant="outline" className="min-h-11" disabled={busy || !!flowId} onClick={() => setDisconnecting(provider)}>Scollega</Button>}
+          <Button data-tour={provider === 'facebook' ? 'social-connect' : undefined} className="min-h-11 whitespace-normal" disabled={busy || !!flowId || !item.configured} onClick={() => connect(provider)}>{item.connected ? translateUI("Ricollega ") + name : translateUI("Collega ") + name}</Button>
+          {item.connected && <Button variant="outline" className="min-h-11" disabled={busy || !!flowId} onClick={() => setDisconnecting(provider)}>{translateUI("Scollega")}</Button>}
         </div>
       </div>;
     })}
-    <Button variant="outline" className="min-h-11" disabled={busy} onClick={load}>Verifica collegamenti</Button>
-    <ConfirmAction open={!!disconnecting} onOpenChange={open => { if (!open) setDisconnecting(''); }} title={'Scollegare ' + (names[disconnecting] || 'il social') + '?'} description="Gli invii ancora in coda per questo social verranno annullati. Foto, testi, date editoriali e gli altri collegamenti restano salvati. Per revocare anche l’autorizzazione al fornitore usa le impostazioni del social." confirmLabel="Scollega" onConfirm={disconnect} busy={busy} />
+    <Button variant="outline" className="min-h-11" disabled={busy} onClick={load}>{translateUI("Verifica collegamenti")}</Button>
+    <ConfirmAction open={!!disconnecting} onOpenChange={open => { if (!open) setDisconnecting(''); }} title={translateUI("Scollegare ") + (names[disconnecting] || translateUI("il social")) + '?'} description={translateUI("Gli invii ancora in coda per questo social verranno annullati. Foto, testi, date editoriali e gli altri collegamenti restano salvati. Per revocare anche l’autorizzazione al fornitore usa le impostazioni del social.")} confirmLabel={translateUI("Scollega")} onConfirm={disconnect} busy={busy} />
   </div>;
 }
 

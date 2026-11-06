@@ -38,7 +38,7 @@ const fetchImpl = async (value) => {
 };
 let app, browser;
 try {
-  app = await createApp({ dataDir:join(directory,'data'), dbDriver:'sqlite', origin, localMode:false, port:0, scheduler:false,
+  app = await createApp({ useProjectEnv:false, dataDir:join(directory,'data'), dbDriver:'sqlite', origin, localMode:false, port:0, scheduler:false,
     smtpHost:'', openaiKey:'', stripeKey:'', googleId:'', metaId:'test', metaSecret:'test', metaLoginConfigId:'', instagramLoginConfigId:instagramConfig, instagramId:'', instagramSecret:'', tiktokKey:'test', tiktokSecret:'test', fetchImpl });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   const local = 'http://127.0.0.1:' + app.server.address().port;
@@ -193,7 +193,7 @@ try {
   assert.equal((await app.integrations.social.status(user)).facebook.accounts[0].id, 'page-two');
   console.log('Finestra bloccata, annullamento tra finestre, consenso rifiutato e scadenza verificati.');
 
-  for (const [provider, name, account] of [['instagram', 'Instagram', '@profilo_di_collaudo'], ['tiktok', 'TikTok', 'TikTok di collaudo']]) {
+  for (const [provider, name, account] of [['instagram', 'Instagram', '@profilo_di_collaudo']]) {
     const authorization = await startConnection(provider, 'Collega ' + name);
     await authorization.popup.close();
     await page.bringToFront();
@@ -203,7 +203,8 @@ try {
     assert.equal(await page.getByRole('alert').count(), 0);
     if (provider === 'instagram') assert.deepEqual((await app.integrations.social.status(user)).instagram.accounts, [{ id:'instagram-test', name:account }]);
   }
-  console.log('Collegamenti Instagram e TikTok confermati senza sostituire Facebook.');
+  assert.equal(await page.getByRole('button', { name: /Collega TikTok/i }).count(), 0);
+  console.log('Collegamento Instagram confermato senza sostituire Facebook; TikTok nascosto.');
 
   async function layout(label, capture = true) {
     const size = page.viewportSize();
@@ -227,38 +228,49 @@ try {
     }
     assert.fail('Guida senza conclusione: ' + label);
   }
+  const longWord = 'TitoloSenzaSpazi'.repeat(10);
+  const homeFixtures = [
+    { title:'Anteprima programmata ' + longWord, status:'in_coda', scheduled_at:new Date(Date.now()+3600000).toISOString() },
+    { title:'Bozza con titolo esteso ' + longWord, status:'bozza' },
+  ];
+  for (const fixture of homeFixtures) {
+    const record = { ...fixture, platform:'instagram', image_url:image.file_url };
+    await app.db.prepare('INSERT INTO posts VALUES (?,?,?,?,?)').run(randomUUID(),user.id,JSON.stringify(record),now(),now());
+  }
   for (const [width,height] of [[320,844],[390,844],[768,900],[1280,900],[844,390]]) {
     await page.setViewportSize({ width, height });
     await page.goto(origin + '/');
-    await page.getByRole('heading', { name:/La tua foto/ }).waitFor();
+    await page.getByRole('heading', { name:'Il tuo spazio social' }).waitFor();
+    for (const fixture of homeFixtures) await page.locator('.home-main .workspace-post-row').getByText(fixture.title, { exact:true }).waitFor();
+    const rowsFit = await page.locator('.home-main .workspace-post-row').evaluateAll((rows, viewportWidth) => rows.every(row => {
+      const list = row.closest('ul').getBoundingClientRect();
+      const card = row.getBoundingClientRect();
+      const arrow = row.lastElementChild.getBoundingClientRect();
+      return card.left >= list.left-1 && card.right <= list.right+1 && card.right <= viewportWidth && arrow.right <= card.right;
+    }), width);
+    assert.ok(rowsFit, 'Una riga della Home supera la propria colonna a ' + width + ' px');
     await layout('home-' + width);
     await page.goto(origin + '/profilo?section=social');
-    await page.getByRole('button', { name:'Ricollega TikTok' }).waitFor();
+    await page.getByRole('button', { name:'Ricollega Instagram' }).waitFor();
     await layout('profilo-' + width);
     await guide('guida-profilo-' + width);
     await page.goto(origin + '/studio');
-    await page.getByText('Studio', { exact:true }).first().waitFor();
+    await page.getByRole('heading', { name:'Crea il tuo post' }).waitFor();
     await layout('studio-' + width);
     await guide('guida-studio-' + width);
     await page.goto(origin + '/library');
-    await page.getByRole('heading', { name:'I miei post' }).waitFor();
+    await page.getByRole('heading', { name:'Post salvati' }).waitFor();
     await page.getByRole('button', { name:'Tutti', exact:true }).click();
     await page.getByRole('article', { name:'Collaudo tiktok' }).waitFor();
     await layout('libreria-' + width);
     await guide('guida-libreria-' + width);
-    await page.getByRole('article', { name:'Collaudo tiktok' }).getByRole('button', { name:'Pubblica', exact:true }).click();
+    assert.ok(await page.getByRole('article', { name:'Collaudo tiktok' }).getByRole('button', { name:'Pubblica', exact:true }).isDisabled(), 'I vecchi post restano visibili senza riattivare TikTok');
+    await page.getByRole('article', { name:'Collaudo instagram' }).getByRole('button', { name:'Pubblica', exact:true }).click();
     await page.getByLabel('Account di destinazione').waitFor();
-    await page.getByLabel('Account di destinazione').selectOption('tiktok-test');
-    await layout('invio-tiktok-' + width);
-    assert.ok(await page.getByRole('button', { name:'Conferma pubblicazione', exact:true }).isDisabled());
-    assert.equal(await page.getByLabel('Chi può vedere il post').inputValue(),'');
-    assert.ok(await page.getByLabel('Consenti commenti', { exact:false }).isDisabled());
-    await page.getByLabel('Chi può vedere il post').selectOption('SELF_ONLY');
-    await page.getByRole('checkbox', { name:'Pubblicando accetto', exact:false }).check();
-    await page.getByRole('button', { name:'Conferma pubblicazione', exact:true }).waitFor();
-    assert.ok(await page.getByRole('button', { name:'Conferma pubblicazione', exact:true }).isEnabled());
-    await layout('invio-tiktok-opzioni-' + width);
-    await page.getByLabel('Testo e hashtag').fill('x'.repeat(4001));
+    await selectValue(page, page.getByLabel('Account di destinazione'), 'instagram-test');
+    await layout('invio-instagram-' + width);
+    await page.getByRole('button', { name:'Conferma pubblicazione', exact:true }).click({ trial:true });
+    await page.getByLabel('Testo e hashtag').fill('x'.repeat(2201));
     await page.getByText('Accorcia il testo di almeno 1 caratteri.').waitFor();
     assert.ok(await page.getByRole('button', { name:'Conferma pubblicazione', exact:true }).isDisabled());
     await page.keyboard.press('Escape');
@@ -266,7 +278,7 @@ try {
   }
   // Conferma esplicita completa, conversione JPEG e persistenza tramite il vero backend di test.
   await page.getByRole('article', { name:'Collaudo instagram' }).getByRole('button', { name:'Pubblica', exact:true }).click();
-  await page.getByLabel('Account di destinazione').selectOption('instagram-test');
+  await selectValue(page, page.getByLabel('Account di destinazione'), 'instagram-test');
   await page.getByLabel('Testo e hashtag').fill('Testo approvato nel collaudo');
   await page.getByRole('button', { name:'Conferma pubblicazione', exact:true }).click();
   await page.getByRole('dialog').waitFor({ state:'hidden' });
@@ -284,7 +296,7 @@ try {
   await app.db.prepare('UPDATE posts SET data=? WHERE id=?').run(JSON.stringify(broken),posts.facebook);
   await page.getByRole('button', { name:'Aggiorna', exact:true }).click();
   await page.getByRole('article', { name:'Collaudo facebook' }).getByRole('button', { name:'Pubblica', exact:true }).click();
-  await page.getByLabel('Pagina Facebook').selectOption('page-two');
+  await selectValue(page, page.getByLabel('Pagina Facebook'), 'page-two');
   await page.getByText('Non riesco a mostrare la foto.', { exact:false }).waitFor();
   assert.ok(await page.getByRole('button', { name:'Conferma pubblicazione', exact:true }).isDisabled());
   await page.keyboard.press('Escape');
@@ -297,3 +309,8 @@ try {
   }
   throw error;
 } finally { await browser?.close(); await app?.close(); }
+
+async function selectValue(page, control, value) {
+  await control.click();
+  await page.locator('[role="option"][data-option-value=' + JSON.stringify(String(value)) + ']').click();
+}

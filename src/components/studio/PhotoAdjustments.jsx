@@ -1,9 +1,11 @@
+import { useI18n, translate as translateUI } from '@/lib/i18n';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Slider } from '@/components/ui/slider';
 import { RotateCcw, LockKeyhole, LockKeyholeOpen } from 'lucide-react';
 import { DEFAULT_FILTERS, PRESETS } from '@/lib/photoPresets';
 
 export default function PhotoAdjustments({ filters, activePreset, onFiltersChange, onPresetChange, disabled = false }) {
+  useI18n();
   const [unlockedFilters, setUnlockedFilters] = useState([]);
   const sliderRefs = useRef({});
   const filterHelpId = useId();
@@ -49,20 +51,19 @@ export default function PhotoAdjustments({ filters, activePreset, onFiltersChang
   return <div className="space-y-5">
         <div data-tour="studio-presets">
           <div className="flex items-center justify-between mb-3">
-            <h4 className="text-sm font-medium text-foreground">Filtri rapidi</h4>
+            <h4 className="text-sm font-medium text-foreground">{translateUI("Filtri rapidi")}</h4>
             <button
               type="button"
               onClick={reset}
               disabled={controlsDisabled}
               className="min-h-11 text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
             >
-              <RotateCcw className="w-3 h-3" /> Ripristina
-            </button>
+              <RotateCcw className="w-3 h-3" />{translateUI("Ripristina")}</button>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {PRESETS.map((p) => (
               <button
-                key={p.name}
+                key={translateUI(p.name)}
                 type="button"
                 disabled={controlsDisabled}
                 aria-pressed={activePreset === p.name}
@@ -80,23 +81,23 @@ export default function PhotoAdjustments({ filters, activePreset, onFiltersChang
           </div>
         </div>
 
-        <section data-tour="studio-filters" aria-label="Regolazioni manuali">
-          <p id={filterHelpId} className="mb-4 text-xs leading-relaxed text-muted-foreground">Premi una barra per sbloccarla. Il primo tocco non cambia il valore. Usa il lucchetto per bloccarla di nuovo.</p>
+        <section data-tour="studio-filters" aria-label={translateUI("Regolazioni manuali")}>
+          <p id={filterHelpId} className="mb-4 text-xs leading-relaxed text-muted-foreground">{translateUI("Premi una barra per sbloccarla. Il primo tocco non cambia il valore. Usa il lucchetto per bloccarla di nuovo.")}</p>
           <div className="grid grid-cols-2 gap-x-5 gap-y-4">
           {sliders.map((s) => {
             const isLocked = !unlockedFilters.includes(s.key);
-            const actionLabel = `${isLocked ? 'Sblocca' : 'Blocca'} ${s.label}`;
+            const actionLabel = translateUI(isLocked ? 'Sblocca {filter}' : 'Blocca {filter}', { filter: translateUI(s.label) });
             const LockIcon = isLocked ? LockKeyhole : LockKeyholeOpen;
             return (
             <div key={s.key}>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs text-muted-foreground">{s.label}</span>
+                <span className="text-xs text-muted-foreground">{translateUI(s.label)}</span>
                 <span className="text-xs text-foreground/60 tabular-nums">{filters[s.key]}</span>
               </div>
               <div className="relative pr-12">
                 <Slider
                 ref={node => { sliderRefs.current[s.key] = node; }}
-                aria-label={s.label}
+                aria-label={translateUI(s.label)}
                 aria-describedby={filterHelpId}
                 disabled={isLocked || controlsDisabled}
                 value={[filters[s.key]]}
